@@ -244,5 +244,63 @@ export function computeAutoLayout(
     rankX += rankWidth + RANK_GAP_X
   })
 
+  // Built-ins are not standalone configuration definitions. Keep each one
+  // close to the group(s) that reference it instead of ordering it by the
+  // very large placeholder Y coordinate assigned during YAML import.
+  const builtins = entities
+    .filter((entity) => entity.kind === 'builtin')
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const groupById = new Map(entities.filter((entity) => entity.kind === 'group').map((entity) => [entity.id, entity]))
+  const placed = new Map(positions)
+
+  const overlaps = (x: number, y: number) => {
+    for (const [id, otherPosition] of placed) {
+      const other = entityById.get(id)
+      if (!other) continue
+      const horizontalOverlap = x < otherPosition.x + NODE_WIDTH + LANE_GAP_X / 2 &&
+        x + NODE_WIDTH + LANE_GAP_X / 2 > otherPosition.x
+      const verticalOverlap = y < otherPosition.y + NODE_HEIGHT + NODE_GAP_Y / 2 &&
+        y + NODE_HEIGHT + NODE_GAP_Y / 2 > otherPosition.y
+      if (horizontalOverlap && verticalOverlap) return true
+    }
+    return false
+  }
+
+  builtins.forEach((builtin, index) => {
+    const referencedGroups = relations
+      .filter((relation) => relation.sourceId === builtin.id && relation.kind === 'member')
+      .map((relation) => groupById.get(relation.targetId))
+      .filter((group): group is ConfigEntity => Boolean(group))
+    const targetPositions = referencedGroups
+      .map((group) => positions.get(group.id))
+      .filter((position): position is LayoutPosition => Boolean(position))
+
+    let x: number
+    let anchorY: number
+    if (targetPositions.length) {
+      x = Math.max(MARGIN_X, Math.min(...targetPositions.map((position) => position.x)) - NODE_WIDTH - LANE_GAP_X)
+      anchorY = targetPositions.reduce((sum, position) => sum + position.y + NODE_HEIGHT / 2, 0) / targetPositions.length
+        - NODE_HEIGHT / 2
+    } else {
+      const maxX = Math.max(MARGIN_X, ...[...positions.values()].map((position) => position.x))
+      x = maxX + NODE_WIDTH + LANE_GAP_X
+      anchorY = MARGIN_Y + index * (NODE_HEIGHT + NODE_GAP_Y)
+    }
+
+    // Search outward from the referenced group's vertical center until a free
+    // slot is found. This also keeps DIRECT and PASS separate when they share
+    // a parent group.
+    let y = anchorY
+    const step = NODE_HEIGHT + NODE_GAP_Y
+    for (let attempt = 1; overlaps(x, y) && attempt < 200; attempt += 1) {
+      const distance = Math.ceil(attempt / 2) * step
+      y = anchorY + (attempt % 2 === 1 ? distance : -distance)
+    }
+
+    const position = { x, y }
+    positions.set(builtin.id, position)
+    placed.set(builtin.id, position)
+  })
+
   return positions
 }
