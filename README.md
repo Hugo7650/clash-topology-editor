@@ -23,7 +23,9 @@
 
 ## 启动
 
-需要 Node.js 20+（推荐 Node.js 22）。
+需要 Node.js 20+（推荐 Node.js 24）。
+
+项目通过 `packageManager` 固定使用 pnpm 10.34.9，CI 与本地开发保持一致。使用 Volta 时可运行 `volta install pnpm@10.34.9` 安装对应版本。
 
 ```bash
 pnpm install
@@ -43,7 +45,7 @@ pnpm run preview
 
 - `@antv/x6` 3.x 的入口不需要导入 `@antv/x6/dist/index.css`；本项目使用 X6 的 SVG attrs 和自己的 `src/style.css` 设置画布样式。
 - 为兼容 pnpm 的严格依赖隔离，项目显式声明 `tslib`，供 X6 ESM 文件引用。
-- pnpm 10 如果提示 `Ignored build scripts: esbuild`，这是依赖脚本审批提示，不是上述 CSS / `tslib` 解析错误的原因。只有后续确实出现 esbuild binary / install script 相关错误时，再运行 `pnpm approve-builds` 并批准 `esbuild`。
+- pnpm 10.34.9 如果提示 `Ignored build scripts: esbuild`，这是依赖脚本审批提示，不是 CSS / `tslib` 解析错误的原因。只有后续确实出现 esbuild binary / install script 相关错误时，再运行 `pnpm approve-builds` 并批准 `esbuild`。
 
 ## 关系方向约定
 
@@ -99,6 +101,7 @@ src/
 仓库已配置 GitHub Actions 工作流：`.github/workflows/deploy.yml`。
 
 - 推送到 `main` 分支后自动安装依赖、执行 `pnpm run build` 并发布 `dist/`。
+- 使用 Node.js 24、pnpm 10.34.9；GitHub Pages Actions 已升级到支持 Node.js 24 的版本。
 - 可以在 GitHub 仓库的 **Actions → Deploy to GitHub Pages → Run workflow** 手动触发。
 - Vite 的 `base` 已设置为 `/clash-topology-editor/`，适配项目站点路径。
 
