@@ -420,7 +420,7 @@ function onEdgeConnected(edge: any) {
 function initGraph() {
   if (!graphHost.value) return
   graph = new Graph({
-    container:graphHost.value, autoResize:true, sorting:'exact', background:{color:theme.value === 'light' ? '#f5f7fb' : '#0d1420'},
+    container:graphHost.value, autoResize:true, background:{color:theme.value === 'light' ? '#f5f7fb' : '#0d1420'},
     grid:{visible:true,type:'dot',size:18,args:{color:theme.value === 'light' ? '#d8e0eb' : '#263449',thickness:1}},
     panning:{enabled:true,eventTypes:['mouseWheelDown']}, scaling:{min:.35,max:2.5}, mousewheel:{enabled:true,factor:1.15,minScale:.35,maxScale:2.5,zoomAtMousePosition:true},
     connecting:{
