@@ -226,6 +226,47 @@ function edgeMeta(relation: ConfigRelation) {
     router:{name:'manhattan',args:{step:18,padding:24,startDirections:['right'],endDirections:['left']}}, connector:{name:'rounded',args:{radius:8}},
   }
 }
+function syncSelectionHighlight() {
+  if (!graph) return
+
+  const selectedEntityId = selectedId.value
+  const selectedRelationIdValue = selectedRelationId.value
+  const hasSelection = Boolean(selectedEntityId || selectedRelationIdValue)
+
+  // Restore each node's own kind color, except the selected node which gets
+  // a clear accent outline and fill.
+  model.value.entities.forEach((entity) => {
+    const node = graph?.getCellById(entity.id)
+    if (!node?.isNode()) return
+    const base = colorFor(entity.kind)
+    const isSelected = entity.id === selectedEntityId
+    node.attr('body/stroke', isSelected ? '#f2bd4f' : base.stroke)
+    node.attr('body/strokeWidth', isSelected ? 3.4 : 1.6)
+    node.attr('body/fill', isSelected
+      ? (theme.value === 'light' ? '#fff6dc' : '#3a321f')
+      : base.fill)
+  })
+
+  // Highlight every incoming and outgoing relationship attached to the
+  // selected node. Unrelated edges are dimmed so the active dependency path
+  // remains easy to follow in dense topologies.
+  model.value.relations.forEach((relation) => {
+    const edge = graph?.getCellById(relation.id)
+    if (!edge?.isEdge()) return
+    const isConnected = Boolean(selectedEntityId && (
+      relation.sourceId === selectedEntityId || relation.targetId === selectedEntityId
+    ))
+    const isSelected = relation.id === selectedRelationIdValue
+    const isHighlighted = isConnected || isSelected
+    const baseStroke = relation.kind === 'provider-use' || relation.kind === 'provider-proxy'
+      ? '#d99d53'
+      : relation.kind === 'dialer' ? '#66b7a3' : '#849ab8'
+
+    edge.attr('line/stroke', isHighlighted ? '#f2bd4f' : baseStroke)
+    edge.attr('line/strokeWidth', isHighlighted ? 3.2 : 1.8)
+    edge.attr('line/opacity', hasSelection && !isHighlighted ? 0.2 : 1)
+  })
+}
 function drawGraph(fitToView = false) {
   if (!graph) return
 
@@ -244,6 +285,7 @@ function drawGraph(fitToView = false) {
   if (fitToView && model.value.entities.length) {
     graph.zoomToFit({ padding: 64, maxScale: 1 })
   }
+  syncSelectionHighlight()
 }
 function autoLayout() {
   if (!graph) return
@@ -410,11 +452,16 @@ function onEdgeConnected(edge: any) {
   if (sameRelation) return
   if (oldRelation) removeRelation(model.value, oldRelation.id)
   const existing = model.value.relations.find((r) => r.sourceId === sourceId && r.targetId === targetId)
-  if (existing) return styleConnectedEdge(edge, existing)
+  if (existing) {
+    styleConnectedEdge(edge, existing)
+    syncSelectionHighlight()
+    return
+  }
   const verdict = canConnect(model.value, sourceId, targetId)
   if (!verdict.ok) { edge.remove(); drawGraph(); notify(verdict.reason ?? '连接无效'); return }
   const relation = connect(model.value, sourceId, targetId)
   styleConnectedEdge(edge, relation)
+  syncSelectionHighlight()
   notify('拓扑引用已更新')
 }
 function initGraph() {
@@ -500,6 +547,7 @@ watch(selectedId, (id) => {
   advancedText.value=item?JSON.stringify(Object.fromEntries(Object.entries(item.raw).filter(([key])=>!reserved.has(key))),null,2):'{}'
   advancedError.value=''
 })
+watch([selectedId, selectedRelationId], () => syncSelectionHighlight())
 watch(theme, async (value) => {
   window.localStorage.setItem('clash-topology-theme', value)
   graph?.dispose()
