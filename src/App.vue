@@ -478,7 +478,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
         </div>
         <div class="yaml-preview-panel">
           <div class="yaml-preview-head"><div><b><span>{ }</span> {{ tr('YAML 预览','YAML preview') }}</b><small>{{ tr('当前完整片段 · 实时序列化','Full fragment · Live serialization') }}</small></div><button class="text-button" @click="openSource">{{ tr('打开源码编辑器 ↗','Open source editor ↗') }}</button></div>
-          <pre>{{ exportYaml(model) || '# 暂无配置' }}</pre>
+          <pre>{{ exportYaml(model) || (language === 'zh' ? '# 暂无配置' : '# No config yet') }}</pre>
         </div>
       </section>
 
@@ -496,7 +496,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
                 <label class="field-label">{{ tr('协议类型','Protocol type') }}</label>
                 <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in mihomoProxyTypes" :key="type">{{ type }}</option></select>
                 <div class="two-fields"><div><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
-                <label class="field-label">{{ tr('拨号代理（dialer-proxy）','Dialer proxy (dialer-proxy)') }}</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('不使用','Disabled') }}</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
+                <label class="field-label">dialer-proxy</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('不使用','Disabled') }}</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select><p class="field-doc-description">{{ tr('指定当前代理通过某个代理节点或策略组建立网络连接。','Route this proxy’s network connections through another proxy or proxy group.') }}</p>
               </template>
               <template v-else-if="selected.kind==='group'">
                 <label class="field-label">{{ tr('策略类型','Group type') }}</label>
@@ -504,7 +504,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
               </template>
               <template v-else-if="selected.kind==='provider'">
                 <label class="field-label">{{ tr('Provider 类型','Provider type') }}</label><select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option value="http">http</option><option value="file">file</option><option value="inline">inline</option></select>
-                <label class="field-label">{{ tr('下载代理（proxy）','Download proxy (proxy)') }}</label><select class="text-input" :value="dependencyName(selected.id,'provider-proxy')" @change="setDependency(selected.id,'provider-proxy',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('直连 / 不指定','Direct / Unspecified') }}</option><option v-for="proxy in proxies" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
+                <label class="field-label">proxy</label><select class="text-input" :value="dependencyName(selected.id,'provider-proxy')" @change="setDependency(selected.id,'provider-proxy',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('直连 / 不指定','Direct / Unspecified') }}</option><option v-for="proxy in proxies" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select><p class="field-doc-description">{{ tr('通过指定代理进行 Provider 下载或更新。','Download or update this provider through the specified proxy.') }}</p>
               </template>
               <div v-else-if="selected.kind==='missing'" class="missing-resolver"><p class="warning-copy">{{ tr('该引用在当前配置片段中没有对应实体。选择它在配置中的真实类型以创建占位定义。','This reference has no matching entity in the current fragment. Choose its actual config type to create a placeholder.') }}</p><button class="button button-secondary button-full" @click="resolveSelectedMissing('proxy')">{{ tr('解析为 Proxy','Resolve as Proxy') }}</button><button class="button button-secondary button-full" @click="resolveSelectedMissing('group')">{{ tr('解析为 Proxy Group','Resolve as Proxy Group') }}</button><button class="button button-secondary button-full" @click="resolveSelectedMissing('provider')">{{ tr('解析为 Provider','Resolve as Provider') }}</button></div>
               <p v-else class="muted-copy">{{ tr('内置代理由 Clash / Mihomo 内核提供，无需在片段中定义。','Built-in proxies are provided by the Clash / Mihomo core and do not need to be defined in this fragment.') }}</p>
@@ -531,7 +531,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
 
 <template v-if="selected.kind==='group'">
               <section class="form-section relation-section">
-                <div class="form-section-head"><div class="form-section-title">{{ tr('策略组成员','Group members') }} <small>{{ selectedMembers.length }}</small></div><em>proxies</em></div>
+                <div class="form-section-head"><div class="form-section-title">{{ tr('策略组成员','Group members') }} <small>{{ selectedMembers.length }}</small></div><em>proxies</em></div><p class="field-doc-description">{{ tr('引用出站代理或其他策略组。','References outbound proxies or other proxy groups.') }}</p>
                 <div v-if="selectedMembers.length" class="member-list">
                   <div v-for="(entry,index) in selectedMembers" :key="entry.relation.id" class="member-row">
                     <i class="member-dot" :class="`${entry.entity.kind}-dot`"></i><span>{{ entry.entity.name }}</span><small>{{ entry.entity.kind==='group'?'GROUP':entry.entity.kind==='builtin'?'BUILT-IN':'PROXY' }}</small>
@@ -543,9 +543,9 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
                 </div>
               </section>
               <section class="form-section relation-section">
-                <div class="form-section-head"><div class="form-section-title">{{ tr('Provider 引用','Provider references') }} <small>{{ selectedProviders.length }}</small></div><em>use</em></div>
+                <div class="form-section-head"><div class="form-section-title">{{ tr('Provider 引用','Provider references') }} <small>{{ selectedProviders.length }}</small></div><em>use</em></div><p class="field-doc-description">{{ tr('引用代理集合（proxy-providers）。','References proxy providers.') }}</p>
                 <div v-for="entry in selectedProviders" :key="entry.relation.id" class="member-row"><i class="member-dot provider-dot"></i><span>{{ entry.entity.name }}</span><small>PROVIDER</small><button class="remove-member" @click="toggleMember(selected!.id,entry.entity.id)">×</button></div>
-                <div class="member-picker"><label v-for="item in providers" :key="item.id"><input type="checkbox" :checked="model.relations.some(r=>r.sourceId===item.id&&r.targetId===selected!.id&&r.kind==='provider-use')" @change="toggleMember(selected!.id,item.id)" /><span>{{ item.name }}</span><small>PROVIDER</small></label><div v-if="!providers.length" class="empty-members">暂无 Provider</div></div>
+                <div class="member-picker"><label v-for="item in providers" :key="item.id"><input type="checkbox" :checked="model.relations.some(r=>r.sourceId===item.id&&r.targetId===selected!.id&&r.kind==='provider-use')" @change="toggleMember(selected!.id,item.id)" /><span>{{ item.name }}</span><small>PROVIDER</small></label><div v-if="!providers.length" class="empty-members">{{ tr('暂无 Provider','No providers yet') }}</div></div>
               </section>
             </template>
 
@@ -572,7 +572,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
       </aside>
     </section>
 
-    <footer class="statusbar"><span><i></i>{{ displayedNotice }}</span><small>{{ errors }} errors · {{ warnings }} warnings <b>·</b> AntV X6 3.x <b>·</b> {{ model.engine }}</small></footer>
+    <footer class="statusbar"><span><i></i>{{ displayedNotice }}</span><small>{{ errors }} {{ tr('个错误','errors') }} · {{ warnings }} {{ tr('个警告','warnings') }} <b>·</b> AntV X6 3.x <b>·</b> {{ model.engine }}</small></footer>
 
     <div v-if="importOpen" class="modal-backdrop" @click.self="importOpen=false">
       <section class="modal">
