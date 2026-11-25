@@ -13,7 +13,7 @@
 - Proxy → Group、Group → Group、Provider → Group、Proxy → Proxy（dialer-proxy）、Proxy → Provider（Provider 下载代理）关系建模。
 - Group 任意层级嵌套；新建连线时验证引用类型、重复关系和循环引用。
 - 节点拖动、端口连线、属性编辑、成员顺序调整。
-- 自动排布：按依赖方向从左到右分层，每层按约 6 行自动换列，避免节点形成过高的单列；使用强连通分量处理循环引用，并通过邻接排序减少连线交叉。布局只影响画布坐标，不写入 YAML。
+- 自动排布：按依赖方向从左到右分层，每层按约 6 行自动换列；DIRECT、PASS 等内置节点会按实际引用它们的策略组定位，并避开其他节点；使用强连通分量处理循环引用和邻接排序减少连线交叉。布局只影响画布坐标，不写入 YAML。
 - 画布操作：滚轮直接缩放（以鼠标位置为中心），按住鼠标中键拖动平移；支持适应画布。
 - `select`、`url-test`、`fallback`、`load-balance`、`relay` 策略类型基础表单。
 - 常见代理协议表单：SS、VMess、VLESS、Trojan、Hysteria2、TUIC、SOCKS5、HTTP、WireGuard 等。
