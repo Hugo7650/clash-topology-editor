@@ -8,6 +8,7 @@ import {
 } from './core/model'
 
 const model = ref<ClashModel>(createDemoModel())
+const theme = ref<'dark'|'light'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-theme') === 'light' ? 'light' : 'dark')
 const graphHost = ref<HTMLDivElement | null>(null)
 const selectedId = ref<string>()
 const selectedRelationId = ref<string>()
@@ -54,13 +55,20 @@ const protocolFields = computed(() => {
 
 const sampleYaml = `proxies:\n  - name: HK-01\n    type: ss\n    server: hk.example.com\n    port: 443\n    cipher: aes-128-gcm\n    password: change-me\n  - name: JP-01\n    type: vless\n    server: jp.example.com\n    port: 443\n    uuid: 00000000-0000-4000-8000-000000000000\n    tls: true\nproxy-providers:\n  provider-hk:\n    type: http\n    url: https://example.com/hk.yaml\n    path: ./providers/hk.yaml\n    interval: 3600\n  provider-jp:\n    type: file\n    path: ./providers/jp.yaml\nproxy-groups:\n  - name: 默认出口\n    type: select\n    proxies: [节点选择, DIRECT]\n  - name: 节点选择\n    type: select\n    proxies: [香港自动选择, 日本自动选择]\n  - name: 香港自动选择\n    type: url-test\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n    proxies: [HK-01]\n    use: [provider-hk]\n  - name: 日本自动选择\n    type: url-test\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n    proxies: [JP-01]\n    use: [provider-jp]\n`
 
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+}
 function notify(message: string) {
   notice.value = message
   window.clearTimeout(noticeTimer)
   noticeTimer = window.setTimeout(() => (notice.value = '就绪'), 2500)
 }
 function colorFor(kind: EntityKind) {
-  const colors: Record<EntityKind, {stroke: string; fill: string}> = {
+  const colors: Record<EntityKind, {stroke: string; fill: string}> = theme.value === 'light' ? {
+    proxy: {stroke:'#299d73',fill:'#e7f6ee'}, group: {stroke:'#568ef0',fill:'#eaf1ff'},
+    provider: {stroke:'#c47a27',fill:'#fff3df'}, builtin: {stroke:'#8492a6',fill:'#edf1f6'},
+    missing: {stroke:'#cf5555',fill:'#fff0f0'},
+  } : {
     proxy: {stroke:'#299d73',fill:'#122d29'}, group: {stroke:'#568ef0',fill:'#172a49'},
     provider: {stroke:'#d18a3b',fill:'#352819'}, builtin: {stroke:'#77869a',fill:'#263140'},
     missing: {stroke:'#df6565',fill:'#351f29'},
@@ -85,12 +93,12 @@ function nodeMeta(item: ConfigEntity) {
     width:item.kind === 'group' ? 244 : 224, height:90,
     attrs:{
       body:{rx:12,ry:12,fill:color.fill,stroke:color.stroke,strokeWidth:1.6,strokeDasharray:item.kind==='missing'?'5 4':undefined},
-      label:{text:labelFor(item),fill:'#eff5fc',fontSize:14,fontWeight:600,lineHeight:21,textWrap:{width:-24,height:-16,ellipsis:true}},
+      label:{text:labelFor(item),fill:theme.value === 'light' ? '#172235' : '#eff5fc',fontSize:14,fontWeight:600,lineHeight:21,textWrap:{width:-24,height:-16,ellipsis:true}},
     },
     data:{entityId:item.id,kind:item.kind},
     ports:{
       groups:{
-        in:{position:'left',attrs:{circle:{r:5,magnet:true,stroke:color.stroke,strokeWidth:1.5,fill:'#0d1420'}}},
+        in:{position:'left',attrs:{circle:{r:5,magnet:true,stroke:color.stroke,strokeWidth:1.5,fill:theme.value === 'light' ? '#f5f7fb' : '#0d1420'}}},
         out:{position:'right',attrs:{circle:{r:5,magnet:true,stroke:color.stroke,strokeWidth:1.5,fill:'#0d1420'}}},
       }, items:[{id:'in',group:'in'},{id:'out',group:'out'}],
     },
@@ -274,8 +282,8 @@ function onEdgeConnected(edge: any) {
 function initGraph() {
   if (!graphHost.value) return
   graph = new Graph({
-    container:graphHost.value, autoResize:true, background:{color:'#0d1420'},
-    grid:{visible:true,type:'dot',size:18,args:{color:'#263449',thickness:1}},
+    container:graphHost.value, autoResize:true, background:{color:theme.value === 'light' ? '#f5f7fb' : '#0d1420'},
+    grid:{visible:true,type:'dot',size:18,args:{color:theme.value === 'light' ? '#d8e0eb' : '#263449',thickness:1}},
     panning:{enabled:true,eventTypes:['mouseWheelDown']}, scaling:{min:.35,max:2.5}, mousewheel:{enabled:true,factor:1.15,minScale:.35,maxScale:2.5,zoomAtMousePosition:true},
     connecting:{
       snap:{radius:24},allowBlank:false,allowLoop:false,allowMulti:false,allowNode:false,allowEdge:false,allowPort:true,
@@ -346,18 +354,26 @@ watch(selectedId, (id) => {
   advancedText.value=item?JSON.stringify(Object.fromEntries(Object.entries(item.raw).filter(([key])=>!reserved.has(key))),null,2):'{}'
   advancedError.value=''
 })
+watch(theme, async (value) => {
+  window.localStorage.setItem('clash-topology-theme', value)
+  graph?.dispose()
+  graph = null
+  await nextTick()
+  initGraph()
+})
 onMounted(()=>{initGraph();window.addEventListener('resize',resizeGraph)})
 onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.clearTimeout(noticeTimer);graph?.dispose();graph=null})
 </script>
 
 <template>
-  <main class="app-shell">
+  <main class="app-shell" :class="{ 'theme-light': theme === 'light' }">
     <header class="topbar">
       <div class="brand-lockup">
         <div class="brand-mark"><i></i><i></i><i></i></div>
         <div><div class="brand-title">Clash Topology</div><div class="brand-subtitle">VISUAL CONFIG EDITOR</div></div>
       </div>
       <div class="topbar-actions">
+        <button class="button button-quiet theme-toggle" @click="toggleTheme" :aria-label="theme === 'dark' ? '切换亮色主题' : '切换深色主题'">{{ theme === 'dark' ? '☀ 亮色主题' : '☾ 深色主题' }}</button>
         <span class="engine-pill"><i></i> Mihomo · YAML Fragment</span>
         <button class="button button-quiet" @click="openImport">↑ 导入 YAML</button>
         <button class="button button-quiet" @click="openSource">{ } 源码模式</button>
