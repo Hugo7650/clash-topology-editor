@@ -82,7 +82,7 @@ function hasNonEmptyText(value: unknown): value is string {
 function isValidProxyPort(value: unknown): boolean {
   const port = typeof value === 'number'
     ? value
-    : typeof value === 'string' && /^\\d+$/.test(value.trim())
+    : typeof value === 'string' && /^\d+$/.test(value.trim())
       ? Number(value.trim())
       : Number.NaN
   return Number.isInteger(port) && port >= 1 && port <= 65535
