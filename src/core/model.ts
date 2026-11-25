@@ -379,7 +379,6 @@ export function validateModel(model: ClashModel): ValidationIssue[] {
       const type = String(item.raw.type ?? '')
       if (!type) issues.push({ level: 'error', message: 'Provider 缺少 type', entityId: item.id })
       if (type === 'http' && !item.raw.url) issues.push({ level: 'error', message: 'HTTP Provider 缺少 url', entityId: item.id })
-      if (['http', 'file'].includes(type) && !item.raw.path) issues.push({ level: 'error', message: `${type} Provider 缺少 path`, entityId: item.id })
     }
     const hasDialerRelation = model.relations.some((relation) => relation.targetId === item.id && relation.kind === 'dialer')
     const hasProviderProxyRelation = model.relations.some((relation) => relation.targetId === item.id && relation.kind === 'provider-proxy')
