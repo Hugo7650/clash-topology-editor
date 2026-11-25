@@ -338,3 +338,88 @@
 @media (max-width: 900px) {
   .auto-layout-button { padding: 4px 7px; }
 }
+
+/* Keep the application inside the viewport; only designated panels scroll. */
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+body {
+  min-height: 0;
+}
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+.workspace {
+  min-height: 0;
+  overflow: hidden;
+}
+.right-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+.inspector-scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.validation-panel {
+  overflow: hidden;
+}
+
+/* Inspector actions: delete and clear-selection remain visually distinct. */
+.inspector-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.panel-heading .delete-small,
+.panel-heading .clear-selection {
+  width: 29px;
+  height: 29px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 18px;
+  line-height: 1;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.panel-heading .clear-selection {
+  border: 1px solid #34475f;
+  background: #1a2a40;
+  color: #b8c7d9;
+}
+.panel-heading .clear-selection:hover {
+  border-color: #7187a3;
+  background: #263b55;
+  color: #f0f5fb;
+}
+.theme-light .panel-heading .delete-small {
+  border-color: #efc8ce;
+  background: #fff1f2;
+  color: #b43e4b;
+}
+.theme-light .panel-heading .delete-small:hover {
+  border-color: #e7a6af;
+  background: #ffe4e7;
+  color: #963440;
+}
+.theme-light .panel-heading .clear-selection {
+  border-color: #d4deea;
+  background: #f4f7fb;
+  color: #52647b;
+}
+.theme-light .panel-heading .clear-selection:hover {
+  border-color: #b8c8dc;
+  background: #e8eff7;
+  color: #263b55;
+}
