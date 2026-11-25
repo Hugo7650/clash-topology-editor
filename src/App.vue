@@ -70,6 +70,66 @@ function usesProxyPortField(item: ConfigEntity) {
 function usesProxyDialerField(item: ConfigEntity) {
   return String(item.raw.type ?? '').toLowerCase() !== 'dns'
 }
+
+const inspectorBasicFieldKeys = ['name', 'type', 'server', 'port', 'dialer-proxy', 'proxies', 'use', 'proxy'] as const
+
+function inspectorDocumentedFields(item: ConfigEntity): MihomoFieldDoc[] {
+  if (!['proxy', 'group', 'provider'].includes(item.kind)) return []
+  return mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))
+    .filter((field) => !inspectorBasicFieldKeys.includes(field.key as typeof inspectorBasicFieldKeys[number]))
+}
+
+function hasObjectPath(target: Record<string, unknown>, path: string): boolean {
+  const parts = path.split('.')
+  let current: unknown = target
+  for (const part of parts) {
+    if (!current || typeof current !== 'object' || Array.isArray(current) ||
+      !Object.prototype.hasOwnProperty.call(current, part)) return false
+    current = (current as Record<string, unknown>)[part]
+  }
+  return true
+}
+
+function removeObjectPath(target: Record<string, unknown>, path: string) {
+  const parts = path.split('.')
+  const remove = (current: Record<string, unknown>, index: number): boolean => {
+    const key = parts[index]
+    if (index === parts.length - 1) {
+      delete current[key]
+    } else {
+      const child = current[key]
+      if (!child || typeof child !== 'object' || Array.isArray(child)) return false
+      remove(child as Record<string, unknown>, index + 1)
+      if (Object.keys(child as Record<string, unknown>).length === 0) delete current[key]
+    }
+    return Object.keys(current).length === 0
+  }
+  remove(target, 0)
+}
+
+function copyObjectPath(source: Record<string, unknown>, target: Record<string, unknown>, path: string) {
+  if (!hasObjectPath(source, path)) return
+  const parts = path.split('.')
+  const leaf = parts.pop()!
+  let sourceParent: unknown = source
+  let targetParent = target
+  for (const part of parts) {
+    sourceParent = (sourceParent as Record<string, unknown>)[part]
+    if (!targetParent[part] || typeof targetParent[part] !== 'object' || Array.isArray(targetParent[part])) {
+      targetParent[part] = {}
+    }
+    targetParent = targetParent[part] as Record<string, unknown>
+  }
+  const value = (sourceParent as Record<string, unknown>)[leaf]
+  targetParent[leaf] = JSON.parse(JSON.stringify(value)) as unknown
+}
+
+function getAdvancedFieldData(item: ConfigEntity): Record<string, unknown> {
+  const result = JSON.parse(JSON.stringify(item.raw)) as Record<string, unknown>
+  for (const key of inspectorBasicFieldKeys) delete result[key]
+  for (const field of inspectorDocumentedFields(item)) removeObjectPath(result, field.key)
+  return result
+}
 const displayedNotice = computed(() => translateMessage(notice.value))
 const memberRelations = computed(() => selected.value?.kind === 'group'
   ? model.value.relations.filter((r) => r.targetId === selected.value!.id && r.kind === 'member').sort((a,b) => a.order-b.order)
@@ -335,8 +395,7 @@ function selectEntity(id: string) {
   selectedId.value = id
   selectedRelationId.value = undefined
   const item = model.value.entities.find((e) => e.id === id)
-  const reserved = new Set(['name','proxies','use','dialer-proxy','proxy'])
-  advancedText.value = item ? JSON.stringify(Object.fromEntries(Object.entries(item.raw).filter(([key]) => !reserved.has(key))), null, 2) : '{}'
+  advancedText.value = item ? JSON.stringify(getAdvancedFieldData(item), null, 2) : '{}'
   advancedError.value = ''
 }
 function clearSelection() {
@@ -359,6 +418,7 @@ function patchRaw(key: string, value: unknown) {
   if (!item) return
   if (value === '' || value === undefined || value === null) delete item.raw[key]
   else item.raw[key] = value
+  if (key === 'type') advancedText.value = JSON.stringify(getAdvancedFieldData(item), null, 2)
   refreshNode(item)
 }
 function dependencyName(targetId: string, kind: 'dialer'|'provider-proxy') {
@@ -410,10 +470,24 @@ function applyAdvanced() {
   if (!item) return
   try {
     const value = JSON.parse(advancedText.value || '{}') as Record<string, unknown>
-    for (const key of ['name','proxies','use','dialer-proxy','proxy']) if (key in value) throw new Error(`${key} 是编辑器管理字段，请在上方编辑`)
-    const reserved = Object.fromEntries(Object.entries(item.raw).filter(([key]) => ['name','proxies','use','dialer-proxy','proxy'].includes(key)))
-    item.raw = {...value,...reserved}
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('高级属性必须是 JSON 对象')
+    for (const key of inspectorBasicFieldKeys) {
+      if (key in value) throw new Error(`${key} 是基本信息或关系字段，请在上方编辑`)
+    }
+    const knownDocumentedFields = inspectorDocumentedFields(item)
+    for (const field of knownDocumentedFields) {
+      if (hasObjectPath(value, field.key)) throw new Error(`${field.key} 已在 Mihomo 文档配置项中编辑`)
+    }
+
+    const previousRaw = item.raw
+    const nextRaw = value
+    for (const key of inspectorBasicFieldKeys) {
+      if (key in previousRaw) nextRaw[key] = previousRaw[key]
+    }
+    for (const field of knownDocumentedFields) copyObjectPath(previousRaw, nextRaw, field.key)
+    item.raw = nextRaw
     if (item.kind === 'proxy' || item.kind === 'group') item.raw.name = item.name
+    advancedText.value = JSON.stringify(getAdvancedFieldData(item), null, 2)
     advancedError.value = ''
     refreshNode(item)
     notify('高级属性已应用')
