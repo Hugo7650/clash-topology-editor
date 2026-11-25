@@ -25,6 +25,17 @@ const model = ref<ClashModel>(initialModel)
 const theme = ref<'dark'|'light'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-theme') === 'light' ? 'light' : 'dark')
 const language = ref<'zh'|'en'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-language') === 'en' ? 'en' : 'zh')
 const graphHost = ref<HTMLDivElement | null>(null)
+const workspace = ref<HTMLElement | null>(null)
+const centerPanel = ref<HTMLElement | null>(null)
+const leftPanelWidth = ref(244)
+const rightPanelWidth = ref(330)
+const yamlPreviewHeight = ref(150)
+const isResizing = ref(false)
+const workspaceStyle = computed(() => ({
+  '--left-panel-width': `${leftPanelWidth.value}px`,
+  '--right-panel-width': `${rightPanelWidth.value}px`,
+  '--yaml-preview-height': `${yamlPreviewHeight.value}px`,
+}) as Record<string, string>)
 const selectedId = ref<string>()
 const selectedRelationId = ref<string>()
 const notice = ref('就绪')
@@ -38,6 +49,76 @@ const advancedError = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 let graph: Graph | null = null
 let noticeTimer = 0
+
+type ResizeTarget = 'left' | 'right' | 'yaml'
+type ActiveResize = {
+  target: ResizeTarget
+  startX: number
+  startY: number
+  startLeft: number
+  startRight: number
+  startYaml: number
+  workspaceWidth: number
+  centerHeight: number
+}
+let activeResize: ActiveResize | null = null
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+function startResize(target: ResizeTarget, event: PointerEvent) {
+  if (event.button !== 0) return
+  const workspaceRect = workspace.value?.getBoundingClientRect()
+  const centerRect = centerPanel.value?.getBoundingClientRect()
+  if (!workspaceRect || !centerRect) return
+
+  event.preventDefault()
+  activeResize = {
+    target,
+    startX: event.clientX,
+    startY: event.clientY,
+    startLeft: leftPanelWidth.value,
+    startRight: rightPanelWidth.value,
+    startYaml: yamlPreviewHeight.value,
+    workspaceWidth: workspaceRect.width,
+    centerHeight: centerRect.height,
+  }
+  isResizing.value = true
+  window.addEventListener('pointermove', moveResize)
+  window.addEventListener('pointerup', stopResize)
+  window.addEventListener('pointercancel', stopResize)
+}
+
+function moveResize(event: PointerEvent) {
+  const drag = activeResize
+  if (!drag) return
+  event.preventDefault()
+
+  const compact = drag.workspaceWidth <= 1200
+  const minCenterWidth = compact ? 320 : 400
+  const handleSpace = 14
+
+  if (drag.target === 'left') {
+    const maxLeft = Math.min(420, drag.workspaceWidth - drag.startRight - minCenterWidth - handleSpace)
+    leftPanelWidth.value = clamp(drag.startLeft + event.clientX - drag.startX, 180, maxLeft)
+  } else if (drag.target === 'right') {
+    const maxRight = Math.min(520, drag.workspaceWidth - drag.startLeft - minCenterWidth - handleSpace)
+    rightPanelWidth.value = clamp(drag.startRight - (event.clientX - drag.startX), 250, maxRight)
+  } else {
+    const maxYaml = drag.centerHeight - 62 - 250 - 7
+    yamlPreviewHeight.value = clamp(drag.startYaml - (event.clientY - drag.startY), 100, maxYaml)
+  }
+}
+
+function stopResize() {
+  if (!activeResize) return
+  activeResize = null
+  isResizing.value = false
+  window.removeEventListener('pointermove', moveResize)
+  window.removeEventListener('pointerup', stopResize)
+  window.removeEventListener('pointercancel', stopResize)
+}
 
 const selected = computed(() => model.value.entities.find((item) => item.id === selectedId.value))
 const selectedRelation = computed(() => model.value.relations.find((item) => item.id === selectedRelationId.value))
@@ -699,6 +780,7 @@ onMounted(()=>{
   graphHost.value?.addEventListener('contextmenu',preventGraphContextMenu)
 })
 onBeforeUnmount(()=>{
+  stopResize()
   window.removeEventListener('resize',resizeGraph)
   graphHost.value?.removeEventListener('contextmenu',preventGraphContextMenu)
   window.clearTimeout(noticeTimer)
@@ -730,7 +812,7 @@ onBeforeUnmount(()=>{
       </div>
     </header>
 
-    <section class="workspace">
+    <section ref="workspace" class="workspace" :class="{ 'is-resizing': isResizing }" :style="workspaceStyle">
       <aside class="left-panel panel">
         <div class="panel-heading"><div><div class="eyebrow">WORKSPACE</div><h2>{{ tr('配置资源','Resources') }}</h2></div><span class="count-chip">{{ proxies.length+groups.length+providers.length }}</span></div>
         <div class="create-actions">
@@ -758,7 +840,9 @@ onBeforeUnmount(()=>{
         <div class="sidebar-foot"><i></i> {{ tr('本地编辑 · 未连接运行内核','Local editing · No core connection') }}</div>
       </aside>
 
-      <section class="center-panel">
+      <div class="resize-handle resize-handle-col" role="separator" aria-orientation="vertical" tabindex="0" :aria-label="tr('调整资源栏宽度','Resize resources pane')" @pointerdown="startResize('left', $event)" @dblclick="leftPanelWidth = 244"></div>
+
+      <section ref="centerPanel" class="center-panel">
         <div class="canvas-toolbar">
           <div><div class="canvas-title">{{ tr('拓扑画布','Topology canvas') }}</div><div class="canvas-subtitle">{{ tr('从依赖节点拖线到引用它的 Group · Group 支持嵌套','Connect from a dependency to its referencing group · Nested groups supported') }}</div></div>
           <div class="canvas-tools">
@@ -773,11 +857,14 @@ onBeforeUnmount(()=>{
           <div class="canvas-hint"><kbd>{{ tr('拖线','Connect') }}</kbd> {{ tr('从依赖节点连到引用它的 Group','from a dependency to its referencing group') }} <span>·</span> {{ tr('滚轮缩放','Scroll to zoom') }} <span>·</span> {{ tr('按住鼠标右键拖动画布','Hold right mouse button to pan') }}</div>
           <div class="canvas-stats">{{ proxies.length }} proxies <i></i> {{ groups.length }} groups <i></i> {{ providers.length }} providers</div>
         </div>
+        <div class="resize-handle resize-handle-row" role="separator" aria-orientation="horizontal" tabindex="0" :aria-label="tr('调整 YAML 预览高度','Resize YAML preview height')" @pointerdown="startResize('yaml', $event)" @dblclick="yamlPreviewHeight = 150"></div>
         <div class="yaml-preview-panel">
           <div class="yaml-preview-head"><div><b><span>{ }</span> {{ tr('YAML 预览','YAML preview') }}</b><small>{{ tr('当前完整片段 · 实时序列化','Full fragment · Live serialization') }}</small></div><button class="text-button" @click="openSource">{{ tr('打开源码编辑器 ↗','Open source editor ↗') }}</button></div>
           <pre>{{ exportYaml(model) || (language === 'zh' ? '# 暂无配置' : '# No config yet') }}</pre>
         </div>
       </section>
+
+      <div class="resize-handle resize-handle-col" role="separator" aria-orientation="vertical" tabindex="0" :aria-label="tr('调整属性栏宽度','Resize inspector pane')" @pointerdown="startResize('right', $event)" @dblclick="rightPanelWidth = 330"></div>
 
       <aside class="right-panel panel">
         <div class="panel-heading"><div><div class="eyebrow">INSPECTOR</div><h2>{{ tr('属性编辑','Inspector') }}</h2></div><div class="inspector-actions"><button v-if="selected && selected.kind!=='builtin'" class="delete-small" :title="tr('删除节点','Delete node')" :aria-label="tr('删除节点','Delete node')" @click="deleteSelected">⌫</button><button v-if="selected || selectedRelation" class="clear-selection" :title="tr('取消选中','Clear selection')" :aria-label="tr('取消选中','Clear selection')" @click="clearSelection">×</button></div></div>
