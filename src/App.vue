@@ -674,10 +674,12 @@ function parsePayload(event: Event) {
   catch { notify('Payload JSON 格式错误') }
 }
 watch(selectedId, (id) => {
-  const item=model.value.entities.find((e)=>e.id===id)
-  const reserved=new Set(['name','proxies','use','dialer-proxy','proxy'])
-  advancedText.value=item?JSON.stringify(Object.fromEntries(Object.entries(item.raw).filter(([key])=>!reserved.has(key))),null,2):'{}'
-  advancedError.value=''
+  const item = model.value.entities.find((entity) => entity.id === id)
+  // Use the same protocol-aware classifier as the documented-fields section.
+  // The previous hard-coded reserved-key list ignored schema fields, so known
+  // Mihomo options were incorrectly copied into the Advanced / unknown editor.
+  advancedText.value = item ? JSON.stringify(getAdvancedFieldData(item), null, 2) : '{}'
+  advancedError.value = ''
 })
 watch([selectedId, selectedRelationId], () => syncSelectionHighlight())
 watch(theme, async (value) => {
