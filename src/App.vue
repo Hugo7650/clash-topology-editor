@@ -227,19 +227,17 @@ function autoLayout() {
     return
   }
 
+  // Compute against the complete domain graph, then persist every coordinate
+  // before rebuilding X6 cells. Rebuilding from the updated model guarantees
+  // that rendered nodes, edges, and model coordinates share one source of truth.
   const positions = computeAutoLayout(model.value.entities, model.value.relations)
-  positions.forEach((position, id) => {
-    const item = model.value.entities.find((entity) => entity.id === id)
-    if (item) item.layout = { x: position.x, y: position.y }
-
-    const node = graph?.getCellById(id)
-    // Do not pass { silent: true } here: X6 would update its model without
-    // redrawing the rendered node, making it jump only on the next interaction.
-    if (node?.isNode()) node.position(position.x, position.y)
+  model.value.entities.forEach((entity) => {
+    const position = positions.get(entity.id)
+    if (position) entity.layout = { x: position.x, y: position.y }
   })
 
-  graph.zoomToFit({ padding: 64, maxScale: 1 })
-  notify(tr('已按依赖关系排布节点（含内置节点）', 'Nodes arranged by dependencies, including built-ins'))
+  drawGraph(true)
+  notify(tr('已重新排布全部节点（含 DIRECT / PASS 等内置节点）', 'All nodes rearranged, including built-ins such as DIRECT and PASS'))
 }
 function refreshNode(item: ConfigEntity) {
   const node = graph?.getCellById(item.id)
