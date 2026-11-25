@@ -283,7 +283,7 @@ function initGraph() {
       validateConnection:({sourceCell,targetCell,sourcePort,targetPort}: any) => Boolean(sourceCell && targetCell && sourcePort==='out' && targetPort==='in' && canConnect(model.value,sourceCell.id,targetCell.id).ok),
     },
   })
-  graph.use(new Selection({enabled:true,multiple:false,rubberband:true}))
+  graph.use(new Selection({enabled:true,multiple:false,rubberband:true,eventTypes:['leftMouseDown']}))
   graph.on('node:click',({node})=>selectEntity(node.id))
   graph.on('edge:click',({edge})=>{selectedId.value=undefined;selectedRelationId.value=edge.id})
   graph.on('blank:click',()=>{selectedId.value=undefined;selectedRelationId.value=undefined})
