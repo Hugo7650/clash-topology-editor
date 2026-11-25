@@ -75,6 +75,19 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
+function hasNonEmptyText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isValidProxyPort(value: unknown): boolean {
+  const port = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && /^\\d+$/.test(value.trim())
+      ? Number(value.trim())
+      : Number.NaN
+  return Number.isInteger(port) && port >= 1 && port <= 65535
+}
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.map((item) => typeof item === 'string' ? item : '').filter(Boolean)
@@ -368,11 +381,54 @@ export function validateModel(model: ClashModel): ValidationIssue[] {
 
   model.entities.forEach((item) => {
     if (item.kind === 'proxy') {
-      if (!item.raw.type) issues.push({ level: 'error', message: '代理节点缺少 type', entityId: item.id })
-      if (!item.raw.server) issues.push({ level: 'error', message: '代理节点缺少 server', entityId: item.id })
-      const port = Number(item.raw.port)
-      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      const type = String(item.raw.type ?? '').trim().toLowerCase()
+      if (!type) issues.push({ level: 'error', message: '代理节点缺少 type', entityId: item.id })
+
+      // Not every Mihomo outbound is a conventional server:port proxy.
+      // These protocols identify their network/identity in protocol-specific fields.
+      const endpointlessTypes = new Set(['dns', 'easytier', 'tailscale', 'zerotier'])
+      const wireGuardPeers = type === 'wireguard' && Array.isArray(item.raw.peers) && item.raw.peers.length > 0
+      const usesRootEndpoint = !endpointlessTypes.has(type) && !wireGuardPeers
+      const hasPortHopping = type === 'hysteria2' &&
+        typeof item.raw.ports === 'string' && item.raw.ports.trim().length > 0
+
+      if (usesRootEndpoint && !hasNonEmptyText(item.raw.server)) {
+        issues.push({ level: 'error', message: '代理节点缺少 server', entityId: item.id })
+      }
+      if (usesRootEndpoint && !hasPortHopping && !isValidProxyPort(item.raw.port)) {
         issues.push({ level: 'error', message: '代理节点 port 必须是 1–65535 的整数', entityId: item.id })
+      }
+
+      if (type === 'easytier') {
+        if (!hasNonEmptyText(item.raw['network-name'])) {
+          issues.push({ level: 'error', message: 'EasyTier 节点缺少 network-name', entityId: item.id })
+        }
+        const peers = Array.isArray(item.raw.peers) ? item.raw.peers : []
+        const listeners = Array.isArray(item.raw.listeners) ? item.raw.listeners : []
+        if (!peers.length && !listeners.length && item.raw['no-listener'] !== false) {
+          issues.push({ level: 'error', message: 'EasyTier 节点缺少入口：请配置 peers、listeners，或 no-listener: false', entityId: item.id })
+        }
+      }
+
+      if (type === 'zerotier' && !hasNonEmptyText(item.raw.network)) {
+        issues.push({ level: 'error', message: 'ZeroTier 节点缺少 network', entityId: item.id })
+      }
+
+      if (type === 'wireguard') {
+        if (!hasNonEmptyText(item.raw['private-key'])) {
+          issues.push({ level: 'error', message: 'WireGuard 节点缺少 private-key', entityId: item.id })
+        }
+        if (wireGuardPeers) {
+          ;(item.raw.peers as unknown[]).forEach((peer, index) => {
+            const peerConfig = asRecord(peer)
+            if (!hasNonEmptyText(peerConfig.server)) {
+              issues.push({ level: 'error', message: `WireGuard peers 第 ${index + 1} 项缺少 server`, entityId: item.id })
+            }
+            if (!isValidProxyPort(peerConfig.port)) {
+              issues.push({ level: 'error', message: `WireGuard peers 第 ${index + 1} 项 port 必须是 1–65535 的整数`, entityId: item.id })
+            }
+          })
+        }
       }
     }
     if (item.kind === 'provider') {
