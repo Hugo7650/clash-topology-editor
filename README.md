@@ -18,6 +18,10 @@
 - 常见代理协议表单：SS、VMess、VLESS、Trojan、Hysteria2、TUIC、SOCKS5、HTTP、WireGuard 等。
 - Provider 的 HTTP / File / Inline 基础属性编辑。
 - 高级 JSON 属性编辑，保留未识别字段。
+- 中英文界面切换，语言偏好保存在浏览器本地；与深浅色主题分别记忆。
+- 根据 Mihomo 官方文档维护代理、策略组和 Provider 配置字段目录，提供双语字段说明、类型和直达文档链接。
+- 协议类型选择覆盖 Mihomo 文档目录中的 HTTP、SOCKS5、SS/SSR、VMess、VLESS、Trojan、AnyTLS、Mieru、Sudoku、Hysteria/Hysteria2、TUIC、ShadowQUIC、WireGuard、EasyTier、Tailscale、SSH、MASQUE、TrustTunnel、ZeroTier 和 OpenVPN。
+- 原生 YAML 配置键（如 `dialer-proxy`、`ip-version`、`health-check.enable`）不随界面语言改变；未纳入字段目录的字段仍由高级 JSON 区域保留和编辑。
 - YAML 粘贴/文件导入、源码模式、全部片段导出。
 - 选中策略组后递归导出该组及其代理、子策略组和 Provider 依赖。
 - 配置重复名称、悬空引用、空策略组和部分测速参数检查。
@@ -92,6 +96,12 @@ pnpm run dev
 - DIRECT、REJECT 等内置目标显示为内置节点，不输出到 `proxies` 定义。
 - 未解析引用显示为红色虚线节点，验证器会报告错误；可以在属性面板中将其解析为 Proxy、Group 或 Provider。
 
+## Mihomo 配置字段参考
+
+字段目录位于 `src/core/mihomo-schema.ts`，按 Proxy 通用字段、协议类型、Proxy Group 和 Proxy Provider 分类维护。每个已覆盖字段包含原生 YAML 键名、值类型、中英文说明及 Mihomo 官方文档链接；界面只翻译说明，不翻译或重写配置键。字段内容依据 Mihomo 官方文档整理，文档更新后需要同步更新此目录。当前未进入目录的字段不会被删除：它们仍保存在 `raw` 中，并可通过高级 JSON 编辑器修改。
+
+主要参考：[Proxy 通用字段](https://wiki.metacubex.one/config/proxies/)、[Proxy Groups](https://wiki.metacubex.one/config/proxy-groups/)、[Proxy Providers](https://wiki.metacubex.one/config/proxy-providers/)。
+
 ## 当前原型的边界
 
 1. 本原型处理三个核心配置片段，不负责完整 Clash 配置的其他顶层部分（如 rules、dns、tun、listeners）。
@@ -110,6 +120,7 @@ src/
   main.ts              Vue 入口
   style.css            页面样式
   core/model.ts        配置领域模型、关系解析、校验和 YAML 序列化
+  core/mihomo-schema.ts Mihomo 官方字段目录、类型与双语说明
 ```
 
 ## 后续建议
