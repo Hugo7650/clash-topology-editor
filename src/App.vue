@@ -229,12 +229,12 @@ function autoLayout() {
   positions.forEach((position, id) => {
     const item = model.value.entities.find((entity) => entity.id === id)
     if (item) item.layout = { x: position.x, y: position.y }
-    const node = graph?.getCellById(id)
-    if (node?.isNode()) node.position(position.x, position.y, { silent: true })
   })
 
-  graph.zoomToFit({ padding: 64, maxScale: 1 })
-  notify(tr('已按配置依赖关系自动排布节点', 'Nodes arranged by configuration dependencies'))
+  // Recreate X6 cells from the authoritative model positions before fitting.
+  // This ensures all computed coordinates, including built-in nodes, are applied.
+  drawGraph(true)
+  notify(tr('已按依赖关系排布节点（含内置节点）', 'Nodes arranged by dependencies, including built-ins'))
 }
 function refreshNode(item: ConfigEntity) {
   const node = graph?.getCellById(item.id)
