@@ -417,13 +417,14 @@ const providerFields: MihomoFieldDoc[] = [
 
 
 export const mihomoProxyTypes = [
-  'http', 'socks5', 'ss', 'ssr', 'snell', 'vmess', 'vless', 'trojan',
+  'dns', 'http', 'socks5', 'ss', 'ssr', 'snell', 'vmess', 'vless', 'trojan',
   'anytls', 'mieru', 'sudoku', 'hysteria', 'hysteria2', 'tuic', 'shadowquic',
   'wireguard', 'easytier', 'tailscale', 'ssh', 'masque', 'trusttunnel',
   'zerotier', 'openvpn',
 ] as const
 
 const protocolDocs: Record<string, string> = {
+  dns: 'https://wiki.metacubex.one/config/proxies/dns/',
   http: 'https://wiki.metacubex.one/config/proxies/http/',
   socks5: 'https://wiki.metacubex.one/config/proxies/socks/',
   ss: 'https://wiki.metacubex.one/config/proxies/ss/',
@@ -455,6 +456,9 @@ export function mihomoProtocolDocsUrl(type: string): string {
 
 export function mihomoFieldsFor(kind: MihomoResourceKind, type: string): MihomoFieldDoc[] {
   if (kind === 'proxy') {
+    // The DNS outbound is handled by Mihomo's internal DNS module and has
+    // no server/port or protocol-specific proxy fields.
+    if (type === 'dns') return []
     return [...proxyCommon, ...(proxyProtocol[type] ?? [])]
   }
   if (kind === 'group') {
