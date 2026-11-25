@@ -251,7 +251,7 @@ export function computeAutoLayout(
     .filter((entity) => entity.kind === 'builtin')
     .sort((a, b) => a.name.localeCompare(b.name))
   const groupById = new Map(entities.filter((entity) => entity.kind === 'group').map((entity) => [entity.id, entity]))
-  const placed = new Map(positions)
+  const placed = new Map([...positions].filter(([id]) => entityById.get(id)?.kind !== 'builtin'))
 
   const overlaps = (x: number, y: number) => {
     for (const [id, otherPosition] of placed) {
