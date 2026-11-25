@@ -703,25 +703,6 @@ onBeforeUnmount(()=>{
               <p v-else class="muted-copy">{{ tr('内置代理由 Clash / Mihomo 内核提供，无需在片段中定义。','Built-in proxies are provided by the Clash / Mihomo core and do not need to be defined in this fragment.') }}</p>
             </section>
 
-                         <section v-if="documentedFields.length" class="form-section mihomo-fields-section">
-               <div class="form-section-head">
-                 <div class="form-section-title">{{ tr('Mihomo 文档配置项','Mihomo documented fields') }}</div>
-                 <a class="field-doc-link section-doc-link" :href="selected.kind==='proxy' ? mihomoProtocolDocsUrl(String(selected.raw.type ?? 'ss')) : selected.kind==='group' ? 'https://wiki.metacubex.one/config/proxy-groups/' : 'https://wiki.metacubex.one/config/proxy-providers/'" target="_blank" rel="noopener noreferrer">Mihomo Docs ↗</a>
-               </div>
-               <p class="muted-copy">{{ tr('字段名和 YAML 键保持 Mihomo 原生写法；说明来自官方文档。复杂对象可在此编辑 JSON。','Field names remain native Mihomo YAML keys. Descriptions are based on official docs; edit complex values as JSON.') }}</p>
-               <div v-for="field in documentedFields" :key="field.key" class="documented-field">
-                 <div class="documented-field-head">
-                   <code>{{ field.key }}</code>
-                   <span v-if="field.deprecated" class="deprecated-chip">{{ tr('已弃用','Deprecated') }}</span>
-                   <a class="field-doc-link" :href="field.docs" target="_blank" rel="noopener noreferrer">{{ tr('文档','Docs') }} ↗</a>
-                 </div>
-                 <p class="field-doc-description">{{ language === 'zh' ? field.zh : field.en }}</p>
-                 <label v-if="field.type==='boolean'" class="switch-row documented-switch"><span>{{ field.key }}</span><input type="checkbox" :checked="Boolean(getDocumentedField(field.key))" @change="updateDocumentedField(field,($event.target as HTMLInputElement).checked)" /><i></i></label>
-                 <textarea v-else-if="field.type==='json'" class="text-input textarea-small documented-json" :value="documentedFieldText(field)" :placeholder="field.key==='payload' ? '[...]' : '{ ... } / [ ... ]'" spellcheck="false" @change="updateDocumentedJsonField(field,($event.target as HTMLTextAreaElement).value)" />
-                 <input v-else class="text-input" :type="field.type==='number'?'number':'text'" :value="String(getDocumentedField(field.key) ?? '')" :placeholder="field.key" @change="updateDocumentedField(field,($event.target as HTMLInputElement).value)" />
-               </div>
-             </section>
-
 <template v-if="selected.kind==='group'">
               <section class="form-section relation-section">
                 <div class="form-section-head"><div class="form-section-title">{{ tr('策略组成员','Group members') }} <small>{{ selectedMembers.length }}</small></div><em>proxies</em></div><p class="field-doc-description">{{ tr('引用出站代理或其他策略组。','References outbound proxies or other proxy groups.') }}</p>
@@ -741,6 +722,27 @@ onBeforeUnmount(()=>{
                 <div class="member-picker"><label v-for="item in providers" :key="item.id"><input type="checkbox" :checked="model.relations.some(r=>r.sourceId===item.id&&r.targetId===selected!.id&&r.kind==='provider-use')" @change="toggleMember(selected!.id,item.id)" /><span>{{ item.name }}</span><small>PROVIDER</small></label><div v-if="!providers.length" class="empty-members">{{ tr('暂无 Provider','No providers yet') }}</div></div>
               </section>
             </template>
+
+                         <section v-if="documentedFields.length" class="form-section mihomo-fields-section">
+               <div class="form-section-head">
+                 <div class="form-section-title">{{ tr('Mihomo 文档配置项','Mihomo documented fields') }}</div>
+                 <a class="field-doc-link section-doc-link" :href="selected.kind==='proxy' ? mihomoProtocolDocsUrl(String(selected.raw.type ?? 'ss')) : selected.kind==='group' ? 'https://wiki.metacubex.one/config/proxy-groups/' : 'https://wiki.metacubex.one/config/proxy-providers/'" target="_blank" rel="noopener noreferrer">Mihomo Docs ↗</a>
+               </div>
+               <p class="muted-copy">{{ tr('字段名和 YAML 键保持 Mihomo 原生写法；说明来自官方文档。复杂对象可在此编辑 JSON。','Field names remain native Mihomo YAML keys. Descriptions are based on official docs; edit complex values as JSON.') }}</p>
+               <div v-for="field in documentedFields" :key="field.key" class="documented-field">
+                 <div class="documented-field-head">
+                   <code>{{ field.key }}</code>
+                   <span v-if="field.deprecated" class="deprecated-chip">{{ tr('已弃用','Deprecated') }}</span>
+                   <a class="field-doc-link" :href="field.docs" target="_blank" rel="noopener noreferrer">{{ tr('文档','Docs') }} ↗</a>
+                 </div>
+                 <p class="field-doc-description">{{ language === 'zh' ? field.zh : field.en }}</p>
+                 <label v-if="field.type==='boolean'" class="switch-row documented-switch"><span>{{ field.key }}</span><input type="checkbox" :checked="Boolean(getDocumentedField(field.key))" @change="updateDocumentedField(field,($event.target as HTMLInputElement).checked)" /><i></i></label>
+                 <textarea v-else-if="field.type==='json'" class="text-input textarea-small documented-json" :value="documentedFieldText(field)" :placeholder="field.key==='payload' ? '[...]' : '{ ... } / [ ... ]'" spellcheck="false" @change="updateDocumentedJsonField(field,($event.target as HTMLTextAreaElement).value)" />
+                 <input v-else class="text-input" :type="field.type==='number'?'number':'text'" :value="String(getDocumentedField(field.key) ?? '')" :placeholder="field.key" @change="updateDocumentedField(field,($event.target as HTMLInputElement).value)" />
+               </div>
+             </section>
+
+
 
             <section v-if="selected.kind==='proxy'||selected.kind==='group'||selected.kind==='provider'" class="form-section advanced-section">
               <div class="form-section-head"><div class="form-section-title">{{ tr('高级 / 未知字段','Advanced / unknown fields') }}</div><em>JSON</em></div>
