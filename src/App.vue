@@ -7,6 +7,7 @@ import {
   type ClashModel, type ConfigEntity, type ConfigRelation, type EntityKind, type ValidationIssue,
 } from './core/model'
 import { mihomoFieldsFor, mihomoProtocolDocsUrl, mihomoProxyTypes, type MihomoFieldDoc, type MihomoResourceKind } from './core/mihomo-schema'
+import { computeAutoLayout } from './core/auto-layout'
 
 const model = ref<ClashModel>(createDemoModel())
 const theme = ref<'dark'|'light'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-theme') === 'light' ? 'light' : 'dark')
@@ -213,6 +214,24 @@ function drawGraph() {
   graph.addNodes(model.value.entities.map(nodeMeta))
   graph.addEdges(model.value.relations.map(edgeMeta))
   nextTick(() => graph?.centerContent())
+}
+function autoLayout() {
+  if (!graph) return
+  if (!model.value.entities.length) {
+    notify(tr('当前没有可排布的节点', 'There are no nodes to arrange'))
+    return
+  }
+
+  const positions = computeAutoLayout(model.value.entities, model.value.relations)
+  positions.forEach((position, id) => {
+    const item = model.value.entities.find((entity) => entity.id === id)
+    if (item) item.layout = { x: position.x, y: position.y }
+    const node = graph?.getCellById(id)
+    if (node?.isNode()) node.position(position.x, position.y, { silent: true })
+  })
+
+  graph.zoomToFit({ padding: 64, maxScale: 1 })
+  notify(tr('已按配置依赖关系自动排布节点', 'Nodes arranged by configuration dependencies'))
 }
 function refreshNode(item: ConfigEntity) {
   const node = graph?.getCellById(item.id)
@@ -520,6 +539,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
           <div><div class="canvas-title">{{ tr('拓扑画布','Topology canvas') }}</div><div class="canvas-subtitle">{{ tr('从依赖节点拖线到引用它的 Group · Group 支持嵌套','Connect from a dependency to its referencing group · Nested groups supported') }}</div></div>
           <div class="canvas-tools">
             <span><i class="legend-dot proxy-dot"></i> Proxy</span><span><i class="legend-dot group-dot"></i> Group</span><span><i class="legend-dot provider-dot"></i> Provider</span>
+            <button class="button button-quiet auto-layout-button" :title="tr('按依赖方向自动分层，减少连线交叉','Arrange nodes in dependency layers and reduce edge crossings')" @click="autoLayout">{{ tr('自动排布','Auto layout') }}</button>
             <button class="icon-button"  :title="tr('适应画布','Fit canvas')" @click="graph?.zoomToFit({padding:48,maxScale:1})">⌗</button>
             <button class="icon-button"  :title="tr('删除选中','Delete selection')" :disabled="!selected && !selectedRelation" @click="deleteSelected">⌫</button>
           </div>
