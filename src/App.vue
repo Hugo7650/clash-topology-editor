@@ -198,6 +198,8 @@ function nodeMeta(item: ConfigEntity) {
   const color = colorFor(item.kind)
   return {
     id: item.id, shape:'rect', x:item.layout.x, y:item.layout.y,
+    // Keep nodes above edge paths so connections are never painted across cards.
+    zIndex: 10,
     width:item.kind === 'group' ? 244 : 224, height:90,
     attrs:{
       body:{rx:12,ry:12,fill:color.fill,stroke:color.stroke,strokeWidth:1.6,strokeDasharray:item.kind==='missing'?'5 4':undefined},
@@ -215,9 +217,13 @@ function nodeMeta(item: ConfigEntity) {
 function edgeMeta(relation: ConfigRelation) {
   return {
     id:relation.id, shape:'edge', source:{cell:relation.sourceId,port:'out'}, target:{cell:relation.targetId,port:'in'},
+    // Edges belong below nodes; X6 otherwise stacks cells in creation order.
+    zIndex: 1,
     data:{relationId:relation.id,kind:relation.kind},
     attrs:{line:{stroke:relation.kind==='provider-use'||relation.kind==='provider-proxy'?'#d99d53':relation.kind==='dialer'?'#66b7a3':'#849ab8',strokeWidth:1.8,strokeDasharray:relation.kind==='provider-use'?'6 4':relation.kind==='provider-proxy'?'2 4':relation.kind==='dialer'?'5 3':undefined,targetMarker:{name:'block',width:8,height:7}}},
-    router:{name:'manhattan',args:{padding:18}}, connector:{name:'rounded',args:{radius:8}},
+    // Topology links always leave the dependency on its right port and
+    // enter the consumer on its left port. The 18px step matches the canvas grid.
+    router:{name:'manhattan',args:{step:18,padding:24,startDirections:['right'],endDirections:['left']}}, connector:{name:'rounded',args:{radius:8}},
   }
 }
 function drawGraph(fitToView = false) {
@@ -414,12 +420,12 @@ function onEdgeConnected(edge: any) {
 function initGraph() {
   if (!graphHost.value) return
   graph = new Graph({
-    container:graphHost.value, autoResize:true, background:{color:theme.value === 'light' ? '#f5f7fb' : '#0d1420'},
+    container:graphHost.value, autoResize:true, sorting:'exact', background:{color:theme.value === 'light' ? '#f5f7fb' : '#0d1420'},
     grid:{visible:true,type:'dot',size:18,args:{color:theme.value === 'light' ? '#d8e0eb' : '#263449',thickness:1}},
     panning:{enabled:true,eventTypes:['mouseWheelDown']}, scaling:{min:.35,max:2.5}, mousewheel:{enabled:true,factor:1.15,minScale:.35,maxScale:2.5,zoomAtMousePosition:true},
     connecting:{
       snap:{radius:24},allowBlank:false,allowLoop:false,allowMulti:false,allowNode:false,allowEdge:false,allowPort:true,
-      router:{name:'manhattan',args:{padding:18}},connector:{name:'rounded',args:{radius:8}},
+      router:{name:'manhattan',args:{step:18,padding:24,startDirections:['right'],endDirections:['left']}},connector:{name:'rounded',args:{radius:8}},
       validateConnection:({sourceCell,targetCell,sourcePort,targetPort}: any) => Boolean(sourceCell && targetCell && sourcePort==='out' && targetPort==='in' && canConnect(model.value,sourceCell.id,targetCell.id).ok),
     },
   })
