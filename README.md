@@ -1,6 +1,10 @@
 # Clash Topology Editor
 
-基于 Vue 3 + TypeScript + AntV X6 3.x 的 Clash / Mihomo 代理配置可视化编辑器原型。
+**Clash / Mihomo proxy configuration editor with an interactive topology graph.** Built with Vue 3, TypeScript and AntV X6, it lets you visually create and edit `proxies`, `proxy-groups` and `proxy-providers`, explore nested proxy groups and their references, validate configuration relationships, and import/export YAML snippets.
+
+**Clash / Mihomo 代理配置可视化编辑器。** 基于 Vue 3、TypeScript 和 AntV X6，将代理节点、策略组和代理提供者转换为可交互的拓扑图，支持多层策略组嵌套、引用关系编辑、配置校验，以及 YAML 配置片段导入和导出。
+
+> This project is an independent community tool and is not affiliated with or endorsed by the Clash or Mihomo projects.
 
 ## 功能
 
