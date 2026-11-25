@@ -231,11 +231,14 @@ function autoLayout() {
   positions.forEach((position, id) => {
     const item = model.value.entities.find((entity) => entity.id === id)
     if (item) item.layout = { x: position.x, y: position.y }
+
+    const node = graph?.getCellById(id)
+    // Do not pass { silent: true } here: X6 would update its model without
+    // redrawing the rendered node, making it jump only on the next interaction.
+    if (node?.isNode()) node.position(position.x, position.y)
   })
 
-  // Recreate X6 cells from the authoritative model positions before fitting.
-  // This ensures all computed coordinates, including built-in nodes, are applied.
-  drawGraph(true)
+  graph.zoomToFit({ padding: 64, maxScale: 1 })
   notify(tr('已按依赖关系排布节点（含内置节点）', 'Nodes arranged by dependencies, including built-ins'))
 }
 function refreshNode(item: ConfigEntity) {
