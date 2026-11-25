@@ -314,6 +314,11 @@ function selectEntity(id: string) {
   advancedText.value = item ? JSON.stringify(Object.fromEntries(Object.entries(item.raw).filter(([key]) => !reserved.has(key))), null, 2) : '{}'
   advancedError.value = ''
 }
+function clearSelection() {
+  selectedId.value = undefined
+  selectedRelationId.value = undefined
+  advancedError.value = ''
+}
 function changed(message?: string) {
   // Computed validation runs against the same domain model as the graph.
   if (message) notify(message)
@@ -646,7 +651,7 @@ onBeforeUnmount(()=>{
       </section>
 
       <aside class="right-panel panel">
-        <div class="panel-heading"><div><div class="eyebrow">INSPECTOR</div><h2>{{ tr('属性编辑','Inspector') }}</h2></div><button v-if="selected && selected.kind!=='builtin'" class="delete-small" @click="deleteSelected">⌫</button></div>
+        <div class="panel-heading"><div><div class="eyebrow">INSPECTOR</div><h2>{{ tr('属性编辑','Inspector') }}</h2></div><div class="inspector-actions"><button v-if="selected && selected.kind!=='builtin'" class="delete-small" :title="tr('删除节点','Delete node')" :aria-label="tr('删除节点','Delete node')" @click="deleteSelected">⌫</button><button v-if="selected || selectedRelation" class="clear-selection" :title="tr('取消选中','Clear selection')" :aria-label="tr('取消选中','Clear selection')" @click="clearSelection">×</button></div></div>
         <template v-if="selected">
           <div class="selected-kind" :class="`${selected.kind}-kind`"><i></i>{{ selected.kind==='proxy'?'PROXY NODE':selected.kind==='group'?'PROXY GROUP':selected.kind==='provider'?'PROXY PROVIDER':selected.kind==='builtin'?'BUILT-IN':'UNRESOLVED REFERENCE' }}</div>
           <div class="inspector-scroll">
