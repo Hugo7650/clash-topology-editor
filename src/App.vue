@@ -54,6 +54,16 @@ const documentedFields = computed(() => {
   return mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))
     .filter((field) => !['name', 'type', 'server', 'port', 'dialer-proxy', 'proxies', 'use', 'proxy'].includes(field.key))
 })
+function usesProxyServerField(item: ConfigEntity) {
+  const type = String(item.raw.type ?? '').toLowerCase()
+  if (['dns', 'easytier', 'tailscale', 'zerotier'].includes(type)) return false
+  return !(type === 'wireguard' && Array.isArray(item.raw.peers) && item.raw.peers.length > 0)
+}
+function usesProxyPortField(item: ConfigEntity) {
+  const type = String(item.raw.type ?? '').toLowerCase()
+  if (!usesProxyServerField(item)) return false
+  return !(type === 'hysteria2' && typeof item.raw.ports === 'string' && item.raw.ports.trim().length > 0)
+}
 const displayedNotice = computed(() => translateMessage(notice.value))
 const memberRelations = computed(() => selected.value?.kind === 'group'
   ? model.value.relations.filter((r) => r.targetId === selected.value!.id && r.kind === 'member').sort((a,b) => a.order-b.order)
@@ -97,6 +107,10 @@ function translateMessage(message: string) {
     '策略组缺少 type': 'Proxy group is missing the required type',
     '代理节点缺少 type': 'Proxy is missing the required type',
     '代理节点缺少 server': 'Proxy is missing the required server',
+    'EasyTier 节点缺少 network-name': 'EasyTier proxy is missing the required network-name',
+    'EasyTier 节点缺少入口：请配置 peers、listeners，或 no-listener: false': 'EasyTier needs at least one peer or listener entry, or no-listener: false',
+    'ZeroTier 节点缺少 network': 'ZeroTier proxy is missing the network ID',
+    'WireGuard 节点缺少 private-key': 'WireGuard proxy is missing the required private-key',
     'Provider 缺少 type': 'Provider is missing the required type',
     'HTTP Provider 缺少 url': 'HTTP Provider is missing the required url',
   }
@@ -106,6 +120,8 @@ function translateMessage(message: string) {
     [/^引用不存在的对象：(.*)$/, (m) => `Reference to missing object: ${m[1]}`],
     [/^关系类型不匹配：(.*) → (.*)$/, (m) => `Relationship type mismatch: ${m[1]} → ${m[2]}`],
     [/^代理节点 port 必须是 1–65535 的整数$/, () => 'Proxy port must be an integer from 1 to 65535'],
+    [/^WireGuard peers 第 (\\d+) 项缺少 server$/, (m) => `WireGuard peer #${m[1]} is missing server`],
+    [/^WireGuard peers 第 (\\d+) 项 port 必须是 1–65535 的整数$/, (m) => `WireGuard peer #${m[1]} port must be an integer from 1 to 65535`],
     [/^HTTP Provider 缺少 url$/, () => 'HTTP Provider is missing the required url'],
     [/^策略组循环引用：(.*)$/, (m) => `Proxy group cycle: ${m[1]}`],
     [/^(url-test|fallback|load-balance) 策略组建议配置 url$/, (m) => `The ${m[1]} proxy group should configure a url`],
@@ -663,7 +679,7 @@ onBeforeUnmount(()=>{
               <template v-if="selected.kind==='proxy'">
                 <label class="field-label">{{ tr('协议类型','Protocol type') }}</label>
                 <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in mihomoProxyTypes" :key="type">{{ type }}</option></select>
-                <div class="two-fields"><div><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
+                <div v-if="usesProxyServerField(selected) || usesProxyPortField(selected)" class="two-fields"><div v-if="usesProxyServerField(selected)"><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div v-if="usesProxyPortField(selected)"><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
                 <label class="field-label">dialer-proxy</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('不使用','Disabled') }}</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select><p class="field-doc-description">{{ tr('指定当前代理通过某个代理节点或策略组建立网络连接。','Route this proxy’s network connections through another proxy or proxy group.') }}</p>
               </template>
               <template v-else-if="selected.kind==='group'">
