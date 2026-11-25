@@ -507,22 +507,21 @@ body {
 
 
 .repository-link {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
   color: #c8d7eb;
   text-decoration: none;
-  white-space: nowrap;
+  flex: 0 0 34px;
 }
 .repository-link svg {
   width: 16px;
   height: 16px;
   fill: currentColor;
   flex: 0 0 auto;
-}
-.repository-link-arrow {
-  font-size: 12px;
-  opacity: .65;
 }
 .repository-link:hover {
   color: #ffffff;
