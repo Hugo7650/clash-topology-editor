@@ -324,3 +324,17 @@
   background: #fff3dc;
   border-color: #ead2a6;
 }
+
+/* Dependency-aware automatic layout */
+.auto-layout-button {
+  min-height: 30px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.theme-light .auto-layout-button {
+  color: #315f9c;
+}
+@media (max-width: 900px) {
+  .auto-layout-button { padding: 4px 7px; }
+}
