@@ -153,7 +153,6 @@ const proxyProtocol: Record<string, MihomoFieldDoc[]> = {
     { key: 'host-key', type: 'json', zh: '允许的 SSH 主机公钥列表；留空表示接受所有主机密钥。', en: 'Allowed SSH host public keys. Empty accepts all host keys.', docs: 'https://wiki.metacubex.one/config/proxies/ssh/' },
     { key: 'host-key-algorithms', type: 'json', zh: '允许的主机密钥算法列表。', en: 'Allowed host-key algorithms.', docs: 'https://wiki.metacubex.one/config/proxies/ssh/' },
   ],
-}
 
   anytls: [
     { key: 'password', type: 'string', zh: 'AnyTLS 认证密码。', en: 'AnyTLS authentication password.', docs: 'https://wiki.metacubex.one/config/proxies/anytls/' },
@@ -354,6 +353,8 @@ const proxyProtocol: Record<string, MihomoFieldDoc[]> = {
     { key: 'remote-dns-resolve', type: 'boolean', zh: '通过控制器提供的 DNS 服务器解析目标域名。', en: 'Resolve destination domain names through controller-provided DNS servers.', docs: 'https://wiki.metacubex.one/config/proxies/zerotier/' },
     { key: 'dns', type: 'json', zh: '覆盖控制器提供的 DNS 服务器地址列表。', en: 'Override the DNS server addresses provided by the controller.', docs: 'https://wiki.metacubex.one/config/proxies/zerotier/' },
   ],
+}
+
 const groupFields: MihomoFieldDoc[] = [
   { key: 'url', type: 'string', zh: '健康检查测试地址。通过 use 引入的 Provider 节点不会由此字段检查。', en: 'Health-check test URL. Nodes brought in through use (proxy providers) are not checked by this field.', docs: groupDocs },
   { key: 'interval', type: 'number', zh: '健康检查间隔；不为 0 时启用周期测试，单位秒。', en: 'Health-check interval. Periodic testing is enabled when non-zero; measured in seconds.', docs: groupDocs },
