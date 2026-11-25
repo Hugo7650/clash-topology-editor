@@ -89,3 +89,23 @@ src/
 - 增加撤销/重做 Command Service，统一记录模型变更与画布位置变更。
 - 增加 DAG 自动布局、组折叠/展开、容器视图和大规模画布虚拟渲染。
 - 增加单元测试：导入→导出语义一致、循环引用、重命名引用更新、依赖闭包导出。
+
+## GitHub Pages 自动部署
+
+仓库已配置 GitHub Actions 工作流：`.github/workflows/deploy.yml`。
+
+- 推送到 `main` 分支后自动安装依赖、执行 `pnpm run build` 并发布 `dist/`。
+- 可以在 GitHub 仓库的 **Actions → Deploy to GitHub Pages → Run workflow** 手动触发。
+- Vite 的 `base` 已设置为 `/clash-topology-editor/`，适配项目站点路径。
+
+首次启用时，请在仓库 **Settings → Pages → Build and deployment → Source** 中选择 **GitHub Actions**。完成首次成功部署后，站点地址为：
+
+https://hugo7650.github.io/clash-topology-editor/
+
+如需本地验证生产包：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm run preview
+```
