@@ -82,10 +82,10 @@ function nodeMeta(item: ConfigEntity) {
   const color = colorFor(item.kind)
   return {
     id: item.id, shape:'rect', x:item.layout.x, y:item.layout.y,
-    width:item.kind === 'group' ? 224 : 206, height:82,
+    width:item.kind === 'group' ? 244 : 224, height:90,
     attrs:{
       body:{rx:12,ry:12,fill:color.fill,stroke:color.stroke,strokeWidth:1.6,strokeDasharray:item.kind==='missing'?'5 4':undefined},
-      label:{text:labelFor(item),fill:'#eff5fc',fontSize:12,fontWeight:600,lineHeight:19,textWrap:{width:-22,height:-14,ellipsis:true}},
+      label:{text:labelFor(item),fill:'#eff5fc',fontSize:14,fontWeight:600,lineHeight:21,textWrap:{width:-24,height:-16,ellipsis:true}},
     },
     data:{entityId:item.id,kind:item.kind},
     ports:{
@@ -276,7 +276,7 @@ function initGraph() {
   graph = new Graph({
     container:graphHost.value, autoResize:true, background:{color:'#0d1420'},
     grid:{visible:true,type:'dot',size:18,args:{color:'#263449',thickness:1}},
-    panning:{enabled:true,modifiers:'space'}, scaling:{min:.4,max:1.8}, mousewheel:{enabled:true,modifiers:['ctrl','meta']},
+    panning:{enabled:true,eventTypes:['mouseWheelDown']}, scaling:{min:.35,max:2.5}, mousewheel:{enabled:true,factor:1.15,minScale:.35,maxScale:2.5,zoomAtMousePosition:true},
     connecting:{
       snap:{radius:24},allowBlank:false,allowLoop:false,allowMulti:false,allowNode:false,allowEdge:false,allowPort:true,
       router:{name:'manhattan',args:{padding:18}},connector:{name:'rounded',args:{radius:8}},
@@ -410,7 +410,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
         </div>
         <div class="canvas-area">
           <div ref="graphHost" class="graph-host"></div>
-          <div class="canvas-hint"><kbd>拖线</kbd> 从依赖节点连到引用它的 Group <span>·</span> Ctrl / ⌘ + 滚轮缩放 <span>·</span> Space + 拖动平移</div>
+          <div class="canvas-hint"><kbd>拖线</kbd> 从依赖节点连到引用它的 Group <span>·</span> 滚轮缩放 <span>·</span> 按住鼠标中键拖动画布</div>
           <div class="canvas-stats">{{ proxies.length }} proxies <i></i> {{ groups.length }} groups <i></i> {{ providers.length }} providers</div>
         </div>
         <div class="yaml-preview-panel">
