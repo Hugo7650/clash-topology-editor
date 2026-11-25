@@ -6,7 +6,7 @@ import {
   removeEntity, removeRelation, resolveMissingEntity, validateModel,
   type ClashModel, type ConfigEntity, type ConfigRelation, type EntityKind, type ValidationIssue,
 } from './core/model'
-import { mihomoFieldsFor, type MihomoFieldDoc, type MihomoResourceKind } from './core/mihomo-schema'
+import { mihomoFieldsFor, mihomoProtocolDocsUrl, mihomoProxyTypes, type MihomoFieldDoc, type MihomoResourceKind } from './core/mihomo-schema'
 
 const model = ref<ClashModel>(createDemoModel())
 const theme = ref<'dark'|'light'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-theme') === 'light' ? 'light' : 'dark')
@@ -494,7 +494,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
 
               <template v-if="selected.kind==='proxy'">
                 <label class="field-label">{{ tr('协议类型','Protocol type') }}</label>
-                <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in ['ss','vmess','vless','trojan','hysteria2','tuic','socks5','http','wireguard','snell','ssh']" :key="type">{{ type }}</option></select>
+                <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in mihomoProxyTypes" :key="type">{{ type }}</option></select>
                 <div class="two-fields"><div><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
                 <label class="field-label">{{ tr('拨号代理（dialer-proxy）','Dialer proxy (dialer-proxy)') }}</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('不使用','Disabled') }}</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
               </template>
@@ -513,7 +513,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
                          <section v-if="documentedFields.length" class="form-section mihomo-fields-section">
                <div class="form-section-head">
                  <div class="form-section-title">{{ tr('Mihomo 文档配置项','Mihomo documented fields') }}</div>
-                 <a class="field-doc-link section-doc-link" :href="selected.kind==='proxy' ? 'https://wiki.metacubex.one/config/proxies/' : selected.kind==='group' ? 'https://wiki.metacubex.one/config/proxy-groups/' : 'https://wiki.metacubex.one/config/proxy-providers/'" target="_blank" rel="noopener noreferrer">Mihomo Docs ↗</a>
+                 <a class="field-doc-link section-doc-link" :href="selected.kind==='proxy' ? mihomoProtocolDocsUrl(String(selected.raw.type ?? 'ss')) : selected.kind==='group' ? 'https://wiki.metacubex.one/config/proxy-groups/' : 'https://wiki.metacubex.one/config/proxy-providers/'" target="_blank" rel="noopener noreferrer">Mihomo Docs ↗</a>
                </div>
                <p class="muted-copy">{{ tr('字段名和 YAML 键保持 Mihomo 原生写法；说明来自官方文档。复杂对象可在此编辑 JSON。','Field names remain native Mihomo YAML keys. Descriptions are based on official docs; edit complex values as JSON.') }}</p>
                <div v-for="field in documentedFields" :key="field.key" class="documented-field">
