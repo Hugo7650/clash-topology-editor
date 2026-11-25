@@ -504,3 +504,35 @@ body {
       minmax(250px, var(--right-panel-width, 300px));
   }
 }
+
+
+.repository-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #c8d7eb;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.repository-link svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex: 0 0 auto;
+}
+.repository-link-arrow {
+  font-size: 12px;
+  opacity: .65;
+}
+.repository-link:hover {
+  color: #ffffff;
+  border-color: #5278aa;
+  background: #1a2a40;
+}
+.theme-light .repository-link {
+  color: #435875;
+}
+.theme-light .repository-link:hover {
+  color: #1e4d88;
+  background: #eaf1fb;
+}
