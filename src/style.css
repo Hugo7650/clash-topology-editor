@@ -423,3 +423,84 @@ body {
   background: #e8eff7;
   color: #263b55;
 }
+
+
+/* Resizable workspace panes */
+.workspace {
+  grid-template-columns:
+    minmax(180px, var(--left-panel-width, 244px))
+    7px
+    minmax(400px, 1fr)
+    7px
+    minmax(250px, var(--right-panel-width, 330px));
+  gap: 0;
+}
+.workspace.is-resizing,
+.workspace.is-resizing * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+.resize-handle {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 7px;
+  background: #0d1725;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+  transition: background .12s ease;
+}
+.resize-handle-col { cursor: col-resize; }
+.resize-handle-row { cursor: row-resize; }
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 34px;
+  border-radius: 4px;
+  background: #40546e;
+  transform: translate(-50%, -50%);
+  transition: background .12s ease, height .12s ease, width .12s ease;
+}
+.resize-handle-row::before {
+  width: 36px;
+  height: 3px;
+}
+.resize-handle:hover,
+.resize-handle:focus-visible,
+.workspace.is-resizing .resize-handle {
+  background: #172942;
+}
+.resize-handle:hover::before,
+.resize-handle:focus-visible::before,
+.workspace.is-resizing .resize-handle::before {
+  background: #79aaf5;
+}
+.center-panel { min-width: 0; }
+.canvas-area { min-height: 250px; }
+.yaml-preview-panel {
+  height: var(--yaml-preview-height, 150px);
+  min-height: 100px;
+  flex: 0 0 var(--yaml-preview-height, 150px);
+}
+.theme-light .resize-handle { background: #e9eef5; }
+.theme-light .resize-handle::before { background: #b4c2d3; }
+.theme-light .resize-handle:hover,
+.theme-light .resize-handle:focus-visible,
+.theme-light .workspace.is-resizing .resize-handle { background: #dce8f7; }
+.theme-light .resize-handle:hover::before,
+.theme-light .resize-handle:focus-visible::before,
+.theme-light .workspace.is-resizing .resize-handle::before { background: #4f84d5; }
+
+@media (max-width: 1200px) {
+  .workspace {
+    grid-template-columns:
+      minmax(180px, var(--left-panel-width, 210px))
+      7px
+      minmax(320px, 1fr)
+      7px
+      minmax(250px, var(--right-panel-width, 300px));
+  }
+}
