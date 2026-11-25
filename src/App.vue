@@ -9,7 +9,19 @@ import {
 import { mihomoFieldsFor, mihomoProtocolDocsUrl, mihomoProxyTypes, type MihomoFieldDoc, type MihomoResourceKind } from './core/mihomo-schema'
 import { computeAutoLayout } from './core/auto-layout'
 
-const model = ref<ClashModel>(createDemoModel())
+// Calculate all node positions before the first graph render. The model's
+// per-kind starter coordinates are only placeholders, not a useful topology.
+function applyComputedLayout(target: ClashModel) {
+  const positions = computeAutoLayout(target.entities, target.relations)
+  target.entities.forEach((entity) => {
+    const position = positions.get(entity.id)
+    if (position) entity.layout = { x: position.x, y: position.y }
+  })
+}
+
+const initialModel = createDemoModel()
+applyComputedLayout(initialModel)
+const model = ref<ClashModel>(initialModel)
 const theme = ref<'dark'|'light'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-theme') === 'light' ? 'light' : 'dark')
 const language = ref<'zh'|'en'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-language') === 'en' ? 'en' : 'zh')
 const graphHost = ref<HTMLDivElement | null>(null)
@@ -234,15 +246,8 @@ function autoLayout() {
     return
   }
 
-  // Compute against the complete domain graph, then persist every coordinate
-  // before rebuilding X6 cells. Rebuilding from the updated model guarantees
-  // that rendered nodes, edges, and model coordinates share one source of truth.
-  const positions = computeAutoLayout(model.value.entities, model.value.relations)
-  model.value.entities.forEach((entity) => {
-    const position = positions.get(entity.id)
-    if (position) entity.layout = { x: position.x, y: position.y }
-  })
-
+  // Compute against the complete domain graph before rebuilding X6 cells.
+  applyComputedLayout(model.value)
   drawGraph(true)
   notify(tr('已重新排布全部节点（含 DIRECT / PASS 等内置节点）', 'All nodes rearranged, including built-ins such as DIRECT and PASS'))
 }
@@ -453,6 +458,7 @@ async function readFile(event: Event) {
 function applyImport() {
   try {
     const parsed=importYaml(importText.value)
+    applyComputedLayout(parsed.model)
     model.value=parsed.model;selectedId.value=undefined;selectedRelationId.value=undefined
     drawGraph(true);importOpen.value=false
     notify(`导入完成：${proxies.value.length} proxies · ${groups.value.length} groups · ${providers.value.length} providers`)
@@ -462,6 +468,7 @@ function openSource() { sourceText.value=exportYaml(model.value);sourceOpen.valu
 function applySource() {
   try {
     const parsed=importYaml(sourceText.value)
+    applyComputedLayout(parsed.model)
     model.value=parsed.model;selectedId.value=undefined;selectedRelationId.value=undefined
     drawGraph(true);sourceOpen.value=false;notify('源码已同步到拓扑')
   } catch(error) { notify(error instanceof Error?error.message:'YAML 解析失败') }
