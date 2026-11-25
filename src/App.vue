@@ -213,10 +213,12 @@ function drawGraph(fitToView = false) {
   graph.clearCells()
   graph.addNodes(model.value.entities.map(nodeMeta))
   graph.addEdges(model.value.relations.map(edgeMeta))
-  nextTick(() => {
-    if (fitToView && model.value.entities.length) graph?.zoomToFit({ padding: 64, maxScale: 1 })
-    else graph?.centerContent()
-  })
+
+  // Fit only when loading/replacing the document or applying auto layout.
+  // Ordinary graph refreshes must keep the user's current pan/zoom untouched.
+  if (fitToView && model.value.entities.length) {
+    graph.zoomToFit({ padding: 64, maxScale: 1 })
+  }
 }
 function autoLayout() {
   if (!graph) return
@@ -413,7 +415,10 @@ function initGraph() {
   graph.on('edge:click',({edge})=>{selectedId.value=undefined;selectedRelationId.value=edge.id})
   graph.on('blank:click',()=>{selectedId.value=undefined;selectedRelationId.value=undefined})
   graph.on('edge:connected',({edge})=>onEdgeConnected(edge))
-  graph.on('node:change:position',({node})=>{
+  // Persist the final position once dragging ends. Updating the reactive
+  // model on every pointer frame repeatedly serializes the YAML preview and
+  // makes node dragging stutter/jump on larger configurations.
+  graph.on('node:moved',({node})=>{
     const item=model.value.entities.find((e)=>e.id===node.id)
     if(item) item.layout={x:node.position().x,y:node.position().y}
   })
