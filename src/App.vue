@@ -48,12 +48,6 @@ const issues = computed(() => validateModel(model.value))
 const displayedIssues = computed(() => issues.value.map((issue) => ({ ...issue, message: translateMessage(issue.message) })))
 const errors = computed(() => issues.value.filter((item) => item.level === 'error').length)
 const warnings = computed(() => issues.value.filter((item) => item.level === 'warning').length)
-const documentedFields = computed(() => {
-  const item = selected.value
-  if (!item || !['proxy', 'group', 'provider'].includes(item.kind)) return []
-  return mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))
-    .filter((field) => !['name', 'type', 'server', 'port', 'dialer-proxy', 'proxies', 'use', 'proxy'].includes(field.key))
-})
 function usesProxyServerField(item: ConfigEntity) {
   const type = String(item.raw.type ?? '').toLowerCase()
   if (['dns', 'easytier', 'tailscale', 'zerotier'].includes(type)) return false
@@ -71,13 +65,48 @@ function usesProxyDialerField(item: ConfigEntity) {
   return String(item.raw.type ?? '').toLowerCase() !== 'dns'
 }
 
-const inspectorBasicFieldKeys = ['name', 'type', 'server', 'port', 'dialer-proxy', 'proxies', 'use', 'proxy'] as const
+// These are the fields that the inspector actually edits outside the
+// advanced JSON editor. Keep this classification protocol-aware so hidden
+// basic inputs do not silently swallow values from imported configurations.
+function inspectorBasicFieldKeys(item: ConfigEntity): string[] {
+  const keys = ['name']
+
+  if (item.kind === 'proxy') {
+    keys.push('type')
+    if (usesProxyServerField(item)) keys.push('server')
+    if (usesProxyPortField(item)) keys.push('port')
+    if (usesProxyDialerField(item)) keys.push('dialer-proxy')
+  } else if (item.kind === 'group') {
+    keys.push('type', 'proxies', 'use')
+  } else if (item.kind === 'provider') {
+    keys.push('type', 'proxy')
+  }
+
+  return keys
+}
+
+function fieldPathsOverlap(left: string, right: string): boolean {
+  return left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`)
+}
 
 function inspectorDocumentedFields(item: ConfigEntity): MihomoFieldDoc[] {
   if (!['proxy', 'group', 'provider'].includes(item.kind)) return []
-  return mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))
-    .filter((field) => !inspectorBasicFieldKeys.includes(field.key as typeof inspectorBasicFieldKeys[number]))
+
+  const basicPaths = inspectorBasicFieldKeys(item)
+  const accepted: MihomoFieldDoc[] = []
+  for (const field of mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))) {
+    const key = field.key.trim()
+    if (!key || basicPaths.some((basicKey) => fieldPathsOverlap(key, basicKey))) continue
+    // A parent JSON field and one of its child paths must not both get
+    // editors: otherwise the same YAML value appears in two sections.
+    if (accepted.some((existing) => fieldPathsOverlap(existing.key, key))) continue
+    accepted.push(field)
+  }
+
+  return accepted
 }
+
+const documentedFields = computed(() => selected.value ? inspectorDocumentedFields(selected.value) : [])
 
 function hasObjectPath(target: Record<string, unknown>, path: string): boolean {
   const parts = path.split('.')
@@ -126,7 +155,7 @@ function copyObjectPath(source: Record<string, unknown>, target: Record<string, 
 
 function getAdvancedFieldData(item: ConfigEntity): Record<string, unknown> {
   const result = JSON.parse(JSON.stringify(item.raw)) as Record<string, unknown>
-  for (const key of inspectorBasicFieldKeys) delete result[key]
+  for (const key of inspectorBasicFieldKeys(item)) removeObjectPath(result, key)
   for (const field of inspectorDocumentedFields(item)) removeObjectPath(result, field.key)
   return result
 }
@@ -471,8 +500,9 @@ function applyAdvanced() {
   try {
     const value = JSON.parse(advancedText.value || '{}') as Record<string, unknown>
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('高级属性必须是 JSON 对象')
-    for (const key of inspectorBasicFieldKeys) {
-      if (key in value) throw new Error(`${key} 是基本信息或关系字段，请在上方编辑`)
+    const basicFieldKeys = inspectorBasicFieldKeys(item)
+    for (const key of basicFieldKeys) {
+      if (hasObjectPath(value, key)) throw new Error(`${key} 是基本信息或关系字段，请在上方编辑`)
     }
     const knownDocumentedFields = inspectorDocumentedFields(item)
     for (const field of knownDocumentedFields) {
@@ -481,9 +511,7 @@ function applyAdvanced() {
 
     const previousRaw = item.raw
     const nextRaw = value
-    for (const key of inspectorBasicFieldKeys) {
-      if (key in previousRaw) nextRaw[key] = previousRaw[key]
-    }
+    for (const key of basicFieldKeys) copyObjectPath(previousRaw, nextRaw, key)
     for (const field of knownDocumentedFields) copyObjectPath(previousRaw, nextRaw, field.key)
     item.raw = nextRaw
     if (item.kind === 'proxy' || item.kind === 'group') item.raw.name = item.name
