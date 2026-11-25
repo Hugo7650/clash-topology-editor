@@ -216,8 +216,8 @@ function drawGraph(fitToView = false) {
   // batched X6 updates; resetCells makes the graph model authoritative and
   // prevents old nodes from surviving alongside the newly laid-out nodes.
   const cells = [
-    ...model.value.entities.map(nodeMeta),
-    ...model.value.relations.map(edgeMeta),
+    ...model.value.entities.map((entity) => graph!.createNode(nodeMeta(entity))),
+    ...model.value.relations.map((relation) => graph!.createEdge(edgeMeta(relation))),
   ]
   graph.resetCells(cells)
 
