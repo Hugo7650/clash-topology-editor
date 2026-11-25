@@ -11,11 +11,13 @@ interface LayoutComponent {
 
 const NODE_WIDTH = 244
 const NODE_HEIGHT = 90
-const NODE_GAP_Y = 34
-const COMPONENT_GAP_Y = 44
-const LAYER_GAP_X = 116
-const MARGIN_X = 80
-const MARGIN_Y = 80
+const NODE_GAP_Y = 28
+const COMPONENT_GAP_Y = 28
+const LANE_GAP_X = 92
+const RANK_GAP_X = 156
+const MAX_ROWS_PER_LANE = 6
+const MARGIN_X = 64
+const MARGIN_Y = 56
 
 const kindOrder: Record<EntityKind, number> = {
   proxy: 0,
@@ -189,26 +191,57 @@ export function computeAutoLayout(
     }
   }
 
-  const layerHeights = layers.map((layer) =>
-    layer.reduce((sum, componentId) => sum + components[componentId].height, 0) +
-    Math.max(0, layer.length - 1) * COMPONENT_GAP_Y,
-  )
-  const maxLayerHeight = Math.max(...layerHeights)
-  const positions = new Map<string, LayoutPosition>()
-
-  layers.forEach((layer, rank) => {
-    let y = MARGIN_Y + (maxLayerHeight - layerHeights[rank]) / 2
+  // A single tall stack makes medium-sized graphs unreadable after zoom-to-fit.
+  // Wrap each dependency rank into compact vertical lanes while keeping every
+  // lane of an earlier rank to the left of every lane in the next rank.
+  const maxLaneHeight = MAX_ROWS_PER_LANE * NODE_HEIGHT + (MAX_ROWS_PER_LANE - 1) * NODE_GAP_Y
+  const packedLayers = layers.map((layer) => {
+    const lanes: Array<{ componentIds: number[]; height: number }> = []
+    let current: number[] = []
+    let currentHeight = 0
 
     layer.forEach((componentId) => {
-      const component = components[componentId]
-      component.nodeIds.forEach((nodeId, index) => {
-        positions.set(nodeId, {
-          x: MARGIN_X + rank * (NODE_WIDTH + LAYER_GAP_X),
-          y: y + index * (NODE_HEIGHT + NODE_GAP_Y),
-        })
-      })
-      y += component.height + COMPONENT_GAP_Y
+      const componentHeight = components[componentId].height
+      const addedHeight = componentHeight + (current.length ? COMPONENT_GAP_Y : 0)
+
+      if (current.length && currentHeight + addedHeight > maxLaneHeight) {
+        lanes.push({ componentIds: current, height: currentHeight })
+        current = []
+        currentHeight = 0
+      }
+
+      if (current.length) currentHeight += COMPONENT_GAP_Y
+      current.push(componentId)
+      currentHeight += componentHeight
     })
+
+    if (current.length) lanes.push({ componentIds: current, height: currentHeight })
+    return lanes
+  })
+
+  const tallestLane = Math.max(0, ...packedLayers.flatMap((lanes) => lanes.map((lane) => lane.height)))
+  const positions = new Map<string, LayoutPosition>()
+  let rankX = MARGIN_X
+
+  packedLayers.forEach((lanes) => {
+    lanes.forEach((lane, laneIndex) => {
+      let y = MARGIN_Y + (tallestLane - lane.height) / 2
+      const x = rankX + laneIndex * (NODE_WIDTH + LANE_GAP_X)
+
+      lane.componentIds.forEach((componentId) => {
+        const component = components[componentId]
+        component.nodeIds.forEach((nodeId, index) => {
+          positions.set(nodeId, {
+            x,
+            y: y + index * (NODE_HEIGHT + NODE_GAP_Y),
+          })
+        })
+        y += component.height + COMPONENT_GAP_Y
+      })
+    })
+
+    const rankWidth = lanes.length * NODE_WIDTH + Math.max(0, lanes.length - 1) * LANE_GAP_X
+    rankX += rankWidth + RANK_GAP_X
   })
 
   return positions
