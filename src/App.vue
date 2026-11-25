@@ -62,7 +62,10 @@ function usesProxyServerField(item: ConfigEntity) {
 function usesProxyPortField(item: ConfigEntity) {
   const type = String(item.raw.type ?? '').toLowerCase()
   if (!usesProxyServerField(item)) return false
-  return !(type === 'hysteria2' && typeof item.raw.ports === 'string' && item.raw.ports.trim().length > 0)
+  if (type === 'hysteria2' && typeof item.raw.ports === 'string' && item.raw.ports.trim().length > 0) return false
+  const hasMieruPortRange = type === 'mieru' && typeof item.raw['port-range'] === 'string' && item.raw['port-range'].trim().length > 0
+  const hasPort = item.raw.port !== undefined && item.raw.port !== null && item.raw.port !== ''
+  return !(hasMieruPortRange && !hasPort)
 }
 function usesProxyDialerField(item: ConfigEntity) {
   return String(item.raw.type ?? '').toLowerCase() !== 'dns'
@@ -114,6 +117,9 @@ function translateMessage(message: string) {
     'EasyTier 节点缺少入口：请配置 peers、listeners，或 no-listener: false': 'EasyTier needs at least one peer or listener entry, or no-listener: false',
     'ZeroTier 节点缺少 network': 'ZeroTier proxy is missing the network ID',
     'WireGuard 节点缺少 private-key': 'WireGuard proxy is missing the required private-key',
+    'Mieru 节点的 port 与 port-range 不能同时配置': 'Mieru cannot configure port and port-range together',
+    'Mieru 节点 port-range 必须是 1–65535 内的单个范围': 'Mieru port-range must be a single range between 1 and 65535',
+    'Mieru 节点需要填写有效的 port 或 port-range': 'Mieru requires a valid port or port-range',
     'Provider 缺少 type': 'Provider is missing the required type',
     'HTTP Provider 缺少 url': 'HTTP Provider is missing the required url',
   }
@@ -682,7 +688,7 @@ onBeforeUnmount(()=>{
               <template v-if="selected.kind==='proxy'">
                 <label class="field-label">{{ tr('协议类型','Protocol type') }}</label>
                 <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in mihomoProxyTypes" :key="type">{{ type }}</option></select>
-                <div v-if="usesProxyServerField(selected) || usesProxyPortField(selected)" class="two-fields"><div v-if="usesProxyServerField(selected)"><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div v-if="usesProxyPortField(selected)"><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
+                <div v-if="usesProxyServerField(selected) || usesProxyPortField(selected)" class="two-fields"><div v-if="usesProxyServerField(selected)"><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div v-if="usesProxyPortField(selected)"><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',($event.target as HTMLInputElement).value.trim() ? Number(($event.target as HTMLInputElement).value) : undefined)" /></div></div>
                 <template v-if="usesProxyDialerField(selected)"><label class="field-label">dialer-proxy</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('不使用','Disabled') }}</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select><p class="field-doc-description">{{ tr('指定当前代理通过某个代理节点或策略组建立网络连接。','Route this proxy’s network connections through another proxy or proxy group.') }}</p></template>
               </template>
               <template v-else-if="selected.kind==='group'">
