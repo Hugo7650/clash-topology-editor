@@ -32,6 +32,7 @@ const proxies = computed(() => model.value.entities.filter((item) => item.kind =
 const groups = computed(() => model.value.entities.filter((item) => item.kind === 'group'))
 const providers = computed(() => model.value.entities.filter((item) => item.kind === 'provider'))
 const issues = computed(() => validateModel(model.value))
+const displayedIssues = computed(() => issues.value.map((issue) => ({ ...issue, message: translateMessage(issue.message) })))
 const errors = computed(() => issues.value.filter((item) => item.level === 'error').length)
 const warnings = computed(() => issues.value.filter((item) => item.level === 'warning').length)
 const documentedFields = computed(() => {
@@ -40,7 +41,7 @@ const documentedFields = computed(() => {
   return mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))
     .filter((field) => !['name', 'type', 'server', 'port', 'dialer-proxy', 'proxies', 'use', 'proxy'].includes(field.key))
 })
-const displayedNotice = computed(() => notice.value === '就绪' ? tr('就绪', 'Ready') : notice.value)
+const displayedNotice = computed(() => translateMessage(notice.value))
 const memberRelations = computed(() => selected.value?.kind === 'group'
   ? model.value.relations.filter((r) => r.targetId === selected.value!.id && r.kind === 'member').sort((a,b) => a.order-b.order)
   : [])
@@ -60,6 +61,58 @@ function toggleLanguage() {
 }
 function tr(zh: string, en: string) {
   return language.value === 'zh' ? zh : en
+}
+function translateMessage(message: string) {
+  if (language.value === 'zh') return message
+  const exact: Record<string, string> = {
+    '就绪': 'Ready',
+    '节点不存在': 'Node does not exist',
+    '不能连接自身': 'A node cannot connect to itself',
+    '该引用关系已经存在': 'This reference already exists',
+    '该连接会形成策略组循环引用': 'This connection would create a proxy-group cycle',
+    '该连接会形成拨号代理循环依赖': 'This connection would create a dialer-proxy cycle',
+    '高级属性已应用': 'Advanced fields applied',
+    'YAML 已导出': 'YAML exported',
+    '拓扑引用已更新': 'Topology reference updated',
+    '当前未发现明显问题': 'No obvious issues found',
+    'JSON 格式错误': 'Invalid JSON format',
+    'YAML 解析失败': 'Failed to parse YAML',
+    'Payload JSON 格式错误': 'Invalid Payload JSON',
+    '该悬空引用来自 use 字段，必须解析为 Provider': 'This unresolved reference comes from use and must be resolved as a Provider',
+    '该悬空引用来自 proxies 字段，应解析为 Proxy 或 Group': 'This unresolved reference comes from proxies and must be resolved as a Proxy or Group',
+    '策略组没有成员或动态引入规则': 'The proxy group has no members or dynamic inclusion rules',
+    '策略组缺少 type': 'Proxy group is missing the required type',
+    '代理节点缺少 type': 'Proxy is missing the required type',
+    '代理节点缺少 server': 'Proxy is missing the required server',
+    'Provider 缺少 type': 'Provider is missing the required type',
+    'HTTP Provider 缺少 url': 'HTTP Provider is missing the required url',
+  }
+  if (exact[message]) return exact[message]
+  const rules: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
+    [/^名称重复：(.*)$/, (m) => `Duplicate name: ${m[1]}`],
+    [/^引用不存在的对象：(.*)$/, (m) => `Reference to missing object: ${m[1]}`],
+    [/^关系类型不匹配：(.*) → (.*)$/, (m) => `Relationship type mismatch: ${m[1]} → ${m[2]}`],
+    [/^代理节点 port 必须是 1–65535 的整数$/, () => 'Proxy port must be an integer from 1 to 65535'],
+    [/^HTTP Provider 缺少 url$/, () => 'HTTP Provider is missing the required url'],
+    [/^策略组循环引用：(.*)$/, (m) => `Proxy group cycle: ${m[1]}`],
+    [/^(url-test|fallback|load-balance) 策略组建议配置 url$/, (m) => `The ${m[1]} proxy group should configure a url`],
+    [/^找不到代理：(.*)$/, (m) => `Proxy not found: ${m[1]}`],
+    [/^名称「(.*)」已经存在$/, (m) => `The name "${m[1]}" already exists`],
+    [/^该连接会形成策略组循环引用$/, () => 'This connection would create a proxy-group cycle'],
+    [/^该连接会形成拨号代理循环依赖$/, () => 'This connection would create a dialer-proxy cycle'],
+    [/^关系类型不支持：(.*)$/, (m) => `Unsupported relationship: ${m[1]}`],
+    [/^名称「(.*)」已经存在$/, (m) => `The name "${m[1]}" already exists`],
+    [/^导入完成：(.*)$/, (m) => `Import completed: ${m[1]}`],
+    [/^(.+) 已创建$/, (m) => `${m[1]} created`],
+    [/^(.+) 已删除，相关引用已移除$/, (m) => `${m[1]} deleted; related references removed`],
+    [/^(.+) 已解析为 (.+)$/, (m) => `${m[1]} resolved as ${m[2]}`],
+    [/^字段 (.+) 的 JSON 格式无效$/, (m) => `Invalid JSON for field ${m[1]}`],
+  ]
+  for (const [pattern, format] of rules) {
+    const match = message.match(pattern)
+    if (match) return format(match)
+  }
+  return message
 }
 function getDocumentedField(key: string): unknown {
   if (!selected.value) return undefined
@@ -566,7 +619,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
 
         <div class="validation-panel">
           <div class="validation-head"><b>{{ tr('配置检查','Validation') }}</b><span><i>{{ errors }} {{ tr('错误','errors') }}</i><em>{{ warnings }} {{ tr('警告','warnings') }}</em></span></div>
-          <div v-if="issues.length" class="issue-list"><button v-for="(issue,index) in issues.slice(0,5)" :key="`${issue.entityId}-${index}`" class="issue-item" @click="focusIssue(issue)"><i :class="issue.level"></i><span>{{ issue.message }}</span><small>↗</small></button></div>
+          <div v-if="displayedIssues.length" class="issue-list"><button v-for="(issue,index) in displayedIssues.slice(0,5)" :key="`${issue.entityId}-${index}`" class="issue-item" @click="focusIssue(issue)"><i :class="issue.level"></i><span>{{ issue.message }}</span><small>↗</small></button></div>
           <div v-else class="all-valid">✓ {{ tr('当前未发现明显问题','No obvious issues found') }}</div>
         </div>
       </aside>
@@ -579,7 +632,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
         <div class="modal-head"><div><div class="eyebrow">YAML IMPORT</div><h2>{{ tr('导入 Clash 配置片段','Import Clash fragment') }}</h2></div><button class="close-button" @click="importOpen=false">×</button></div>
         <p>{{ tr('粘贴 YAML 或选择文件。导入后将替换画布中的 proxies、proxy-groups 和 proxy-providers。','Paste YAML or choose a file. Import replaces proxies, proxy-groups, and proxy-providers in the canvas.') }}</p>
         <div class="file-row"><input ref="fileInput" type="file" accept=".yaml,.yml,text/yaml,text/plain" @change="readFile" /><button class="button button-secondary" @click="fileInput?.click()">{{ tr('选择 YAML 文件','Choose YAML file') }}</button><small>{{ tr('支持 .yaml / .yml','Supports .yaml / .yml') }}</small></div>
-        <textarea v-model="importText" class="large-code-editor" spellcheck="false" placeholder="{{ tr('粘贴配置片段...','Paste a config fragment...') }}" />
+        <textarea v-model="importText" class="large-code-editor" spellcheck="false" :placeholder="tr('粘贴配置片段...','Paste a config fragment...')" />
         <div class="modal-foot"><small>{{ tr('只处理三个核心配置片段；其他顶层配置不会导出。','Only the three core sections are handled; other top-level settings are not exported.') }}</small><div><button class="button button-quiet" @click="importOpen=false">{{ tr('取消','Cancel') }}</button><button class="button button-primary" @click="applyImport">{{ tr('解析并导入','Parse and import') }}</button></div></div>
       </section>
     </div>
