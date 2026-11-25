@@ -88,6 +88,16 @@ function isValidProxyPort(value: unknown): boolean {
   return Number.isInteger(port) && port >= 1 && port <= 65535
 }
 
+function isValidProxyPortRange(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const match = value.trim().match(/^(\\d+)-(\\d+)$/)
+  if (!match) return false
+  const start = Number(match[1])
+  const end = Number(match[2])
+  return Number.isInteger(start) && Number.isInteger(end) &&
+    start >= 1 && end <= 65535 && start <= end
+}
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.map((item) => typeof item === 'string' ? item : '').filter(Boolean)
@@ -395,7 +405,18 @@ export function validateModel(model: ClashModel): ValidationIssue[] {
       if (usesRootEndpoint && !hasNonEmptyText(item.raw.server)) {
         issues.push({ level: 'error', message: '代理节点缺少 server', entityId: item.id })
       }
-      if (usesRootEndpoint && !hasPortHopping && !isValidProxyPort(item.raw.port)) {
+      if (usesRootEndpoint && type === 'mieru') {
+        const portRange = item.raw['port-range']
+        const hasPortRange = hasNonEmptyText(portRange)
+        const hasPort = item.raw.port !== undefined && item.raw.port !== null && item.raw.port !== ''
+        if (hasPortRange && hasPort) {
+          issues.push({ level: 'error', message: 'Mieru 节点的 port 与 port-range 不能同时配置', entityId: item.id })
+        } else if (hasPortRange && !isValidProxyPortRange(portRange)) {
+          issues.push({ level: 'error', message: 'Mieru 节点 port-range 必须是 1–65535 内的单个范围', entityId: item.id })
+        } else if (!hasPortRange && !isValidProxyPort(item.raw.port)) {
+          issues.push({ level: 'error', message: 'Mieru 节点需要填写有效的 port 或 port-range', entityId: item.id })
+        }
+      } else if (usesRootEndpoint && !hasPortHopping && !isValidProxyPort(item.raw.port)) {
         issues.push({ level: 'error', message: '代理节点 port 必须是 1–65535 的整数', entityId: item.id })
       }
 
