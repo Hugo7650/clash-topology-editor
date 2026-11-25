@@ -196,12 +196,62 @@ const providerFields: MihomoFieldDoc[] = [
   { key: 'override.additional-prefix', type: 'string', zh: '为订阅节点名称添加固定前缀。', en: 'Add a fixed prefix to subscription node names.', docs: providerDocs },
   { key: 'override.additional-suffix', type: 'string', zh: '为订阅节点名称添加固定后缀。', en: 'Add a fixed suffix to subscription node names.', docs: providerDocs },
   { key: 'override.proxy-name', type: 'json', zh: '节点名称替换规则数组；每项包含 pattern 和 target，支持正则表达式。', en: 'Node-name replacement rules. Each item contains pattern and target; regular expressions are supported.', docs: providerDocs },
+  { key: 'override.tfo', type: 'boolean', zh: '覆写订阅节点的 TCP Fast Open 设置。', en: 'Override TCP Fast Open for subscription nodes.', docs: providerDocs },
+  { key: 'override.mptcp', type: 'boolean', zh: '覆写订阅节点的 TCP Multi Path 设置。', en: 'Override TCP Multi Path for subscription nodes.', docs: providerDocs },
+  { key: 'override.udp', type: 'boolean', zh: '覆写订阅节点的 UDP 设置。', en: 'Override UDP for subscription nodes.', docs: providerDocs },
+  { key: 'override.udp-over-tcp', type: 'boolean', zh: '覆写 Shadowsocks 节点的 UDP over TCP 设置。', en: 'Override UDP over TCP for Shadowsocks nodes.', docs: providerDocs },
+  { key: 'override.up', type: 'string', zh: '覆写节点上行带宽（适用于 Hysteria / Hysteria2）。', en: 'Override node upload bandwidth (Hysteria / Hysteria2).', docs: providerDocs },
+  { key: 'override.down', type: 'string', zh: '覆写节点下行带宽（适用于 Hysteria / Hysteria2）。', en: 'Override node download bandwidth (Hysteria / Hysteria2).', docs: providerDocs },
+  { key: 'override.skip-cert-verify', type: 'boolean', zh: '覆写节点的 TLS 证书验证设置。', en: 'Override TLS certificate verification for subscription nodes.', docs: providerDocs },
+  { key: 'override.name-cert-verify', type: 'string', zh: '覆写节点证书名称验证主机名。', en: 'Override the certificate name-verification hostname.', docs: providerDocs },
+  { key: 'override.dialer-proxy', type: 'string', zh: '覆写订阅节点使用的拨号代理。', en: 'Override the dialer proxy used by subscription nodes.', docs: providerDocs },
+  { key: 'override.interface-name', type: 'string', zh: '覆写订阅节点绑定的网络接口。', en: 'Override the network interface bound by subscription nodes.', docs: providerDocs },
+  { key: 'override.routing-mark', type: 'number', zh: '覆写订阅节点的路由标记。', en: 'Override the routing mark for subscription nodes.', docs: providerDocs },
+  { key: 'override.ip-version', type: 'string', zh: '覆写订阅节点出站连接使用的 IP 版本。', en: 'Override the IP version used by subscription-node outbound connections.', docs: providerDocs },
   { key: 'override.override-expr', type: 'json', zh: '基于 yq v4 子集的表达式覆盖规则数组；按顺序执行。', en: 'Ordered expression-based overrides using a supported subset of yq v4.', docs: providerDocs },
   { key: 'filter', type: 'string', zh: '按关键词或正则表达式筛选 Provider 中的节点。', en: 'Filter provider nodes by keywords or regular expressions.', docs: providerDocs },
   { key: 'exclude-filter', type: 'string', zh: '按关键词或正则表达式排除 Provider 中的节点。', en: 'Exclude provider nodes by keywords or regular expressions.', docs: providerDocs },
   { key: 'exclude-type', type: 'string', zh: '按节点类型排除；使用 | 分隔类型，不支持正则表达式。', en: 'Exclude nodes by adapter type. Separate types with |; regular expressions are not supported.', docs: providerDocs },
   { key: 'payload', type: 'json', zh: 'inline 类型 Provider 使用的节点配置数组。', en: 'Node configuration array used by inline providers.', docs: providerDocs },
 ]
+
+
+export const mihomoProxyTypes = [
+  'http', 'socks5', 'ss', 'ssr', 'snell', 'vmess', 'vless', 'trojan',
+  'anytls', 'mieru', 'sudoku', 'hysteria', 'hysteria2', 'tuic', 'shadowquic',
+  'wireguard', 'easytier', 'tailscale', 'ssh', 'masque', 'trusttunnel',
+  'zerotier', 'openvpn',
+] as const
+
+const protocolDocs: Record<string, string> = {
+  http: 'https://wiki.metacubex.one/config/proxies/http/',
+  socks5: 'https://wiki.metacubex.one/config/proxies/socks/',
+  ss: 'https://wiki.metacubex.one/config/proxies/ss/',
+  ssr: 'https://wiki.metacubex.one/config/proxies/ssr/',
+  snell: 'https://wiki.metacubex.one/config/proxies/snell/',
+  vmess: 'https://wiki.metacubex.one/config/proxies/vmess/',
+  vless: 'https://wiki.metacubex.one/config/proxies/vless/',
+  trojan: 'https://wiki.metacubex.one/config/proxies/trojan/',
+  anytls: 'https://wiki.metacubex.one/config/proxies/anytls/',
+  mieru: 'https://wiki.metacubex.one/config/proxies/mieru/',
+  sudoku: 'https://wiki.metacubex.one/config/proxies/sudoku/',
+  hysteria: 'https://wiki.metacubex.one/config/proxies/hysteria/',
+  hysteria2: 'https://wiki.metacubex.one/config/proxies/hysteria2/',
+  tuic: 'https://wiki.metacubex.one/config/proxies/tuic/',
+  shadowquic: 'https://wiki.metacubex.one/config/proxies/shadowquic/',
+  wireguard: 'https://wiki.metacubex.one/config/proxies/wg/',
+  easytier: 'https://wiki.metacubex.one/config/proxies/easytier/',
+  tailscale: 'https://wiki.metacubex.one/config/proxies/tailscale/',
+  ssh: 'https://wiki.metacubex.one/config/proxies/ssh/',
+  masque: 'https://wiki.metacubex.one/config/proxies/masque/',
+  trusttunnel: 'https://wiki.metacubex.one/config/proxies/trusttunnel/',
+  zerotier: 'https://wiki.metacubex.one/config/proxies/zerotier/',
+  openvpn: 'https://wiki.metacubex.one/config/proxies/openvpn/',
+}
+
+export function mihomoProtocolDocsUrl(type: string): string {
+  return protocolDocs[type] ?? proxyDocs
+}
 
 export function mihomoFieldsFor(kind: MihomoResourceKind, type: string): MihomoFieldDoc[] {
   if (kind === 'proxy') {
