@@ -422,7 +422,7 @@ function initGraph() {
   graph = new Graph({
     container:graphHost.value, autoResize:true, background:{color:theme.value === 'light' ? '#f5f7fb' : '#0d1420'},
     grid:{visible:true,type:'dot',size:18,args:{color:theme.value === 'light' ? '#d8e0eb' : '#263449',thickness:1}},
-    panning:{enabled:true,eventTypes:['mouseWheelDown']}, scaling:{min:.35,max:2.5}, mousewheel:{enabled:true,factor:1.15,minScale:.35,maxScale:2.5,zoomAtMousePosition:true},
+    panning:{enabled:true,eventTypes:['rightMouseDown']}, scaling:{min:.35,max:2.5}, mousewheel:{enabled:true,factor:1.15,minScale:.35,maxScale:2.5,zoomAtMousePosition:true},
     connecting:{
       snap:{radius:24},allowBlank:false,allowLoop:false,allowMulti:false,allowNode:false,allowEdge:false,allowPort:true,
       router:{name:'manhattan',args:{step:18,padding:24,startDirections:['right'],endDirections:['left']}},connector:{name:'rounded',args:{radius:8}},
@@ -445,6 +445,9 @@ function initGraph() {
 }
 function resizeGraph() {
   if (graph && graphHost.value) graph.resize(graphHost.value.clientWidth,graphHost.value.clientHeight)
+}
+function preventGraphContextMenu(event: MouseEvent) {
+  event.preventDefault()
 }
 function download(text: string, filename: string) {
   const url=URL.createObjectURL(new Blob([text],{type:'text/yaml;charset=utf-8'}))
@@ -508,8 +511,18 @@ watch(language, (value) => {
   window.localStorage.setItem('clash-topology-language', value)
   drawGraph()
 })
-onMounted(()=>{initGraph();window.addEventListener('resize',resizeGraph)})
-onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.clearTimeout(noticeTimer);graph?.dispose();graph=null})
+onMounted(()=>{
+  initGraph()
+  window.addEventListener('resize',resizeGraph)
+  graphHost.value?.addEventListener('contextmenu',preventGraphContextMenu)
+})
+onBeforeUnmount(()=>{
+  window.removeEventListener('resize',resizeGraph)
+  graphHost.value?.removeEventListener('contextmenu',preventGraphContextMenu)
+  window.clearTimeout(noticeTimer)
+  graph?.dispose()
+  graph=null
+})
 </script>
 
 <template>
@@ -575,7 +588,7 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
         </div>
         <div class="canvas-area">
           <div ref="graphHost" class="graph-host"></div>
-          <div class="canvas-hint"><kbd>{{ tr('拖线','Connect') }}</kbd> {{ tr('从依赖节点连到引用它的 Group','from a dependency to its referencing group') }} <span>·</span> {{ tr('滚轮缩放','Scroll to zoom') }} <span>·</span> {{ tr('按住鼠标中键拖动画布','Hold middle mouse to pan') }}</div>
+          <div class="canvas-hint"><kbd>{{ tr('拖线','Connect') }}</kbd> {{ tr('从依赖节点连到引用它的 Group','from a dependency to its referencing group') }} <span>·</span> {{ tr('滚轮缩放','Scroll to zoom') }} <span>·</span> {{ tr('按住鼠标右键拖动画布','Hold right mouse button to pan') }}</div>
           <div class="canvas-stats">{{ proxies.length }} proxies <i></i> {{ groups.length }} groups <i></i> {{ providers.length }} providers</div>
         </div>
         <div class="yaml-preview-panel">
