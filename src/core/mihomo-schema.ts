@@ -425,17 +425,6 @@ export const mihomoProxyTypes = [
 
 const protocolDocs: Record<string, string> = {
   http: 'https://wiki.metacubex.one/config/proxies/http/',
-  ssr: 'https://wiki.metacubex.one/config/proxies/ssr/',
-  anytls: 'https://wiki.metacubex.one/config/proxies/anytls/',
-  mieru: 'https://wiki.metacubex.one/config/proxies/mieru/',
-  sudoku: 'https://wiki.metacubex.one/config/proxies/sudoku/',
-  hysteria: 'https://wiki.metacubex.one/config/proxies/hysteria/',
-  shadowquic: 'https://wiki.metacubex.one/config/proxies/shadowquic/',
-  easytier: 'https://wiki.metacubex.one/config/proxies/easytier/',
-  tailscale: 'https://wiki.metacubex.one/config/proxies/tailscale/',
-  masque: 'https://wiki.metacubex.one/config/proxies/masque/',
-  trusttunnel: 'https://wiki.metacubex.one/config/proxies/trusttunnel/',
-  openvpn: 'https://wiki.metacubex.one/config/proxies/openvpn/',
   socks5: 'https://wiki.metacubex.one/config/proxies/socks/',
   ss: 'https://wiki.metacubex.one/config/proxies/ss/',
   ssr: 'https://wiki.metacubex.one/config/proxies/ssr/',
