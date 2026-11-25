@@ -13,6 +13,7 @@
 - Proxy → Group、Group → Group、Provider → Group、Proxy → Proxy（dialer-proxy）、Proxy → Provider（Provider 下载代理）关系建模。
 - Group 任意层级嵌套；新建连线时验证引用类型、重复关系和循环引用。
 - 节点拖动、端口连线、属性编辑、成员顺序调整。
+- 画布操作：滚轮直接缩放（以鼠标位置为中心），按住鼠标中键拖动平移；支持适应画布。
 - `select`、`url-test`、`fallback`、`load-balance`、`relay` 策略类型基础表单。
 - 常见代理协议表单：SS、VMess、VLESS、Trojan、Hysteria2、TUIC、SOCKS5、HTTP、WireGuard 等。
 - Provider 的 HTTP / File / Inline 基础属性编辑。
@@ -62,6 +63,13 @@ pnpm run dev
 ```
 
 升级后如果要主动刷新 lockfile，可在确认依赖更新内容后运行 `pnpm install` 并提交锁文件变更。
+
+### 画布操作
+
+- 鼠标滚轮：直接缩放画布，缩放中心跟随鼠标位置。
+- 按住鼠标中键并拖动：平移画布。
+- 左键：选择、拖动节点和创建连线。
+- 工具栏的“适应画布”按钮：让当前拓扑完整进入视口。
 
 ## 关系方向约定
 
