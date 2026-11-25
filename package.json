@@ -19,5 +19,6 @@
     "typescript": "~5.7.2",
     "vite": "^6.0.7",
     "vue-tsc": "^2.2.0"
-  }
+  },
+  "packageManager": "pnpm@10.34.9"
 }
