@@ -208,12 +208,15 @@ function edgeMeta(relation: ConfigRelation) {
     router:{name:'manhattan',args:{padding:18}}, connector:{name:'rounded',args:{radius:8}},
   }
 }
-function drawGraph() {
+function drawGraph(fitToView = false) {
   if (!graph) return
   graph.clearCells()
   graph.addNodes(model.value.entities.map(nodeMeta))
   graph.addEdges(model.value.relations.map(edgeMeta))
-  nextTick(() => graph?.centerContent())
+  nextTick(() => {
+    if (fitToView && model.value.entities.length) graph?.zoomToFit({ padding: 64, maxScale: 1 })
+    else graph?.centerContent()
+  })
 }
 function autoLayout() {
   if (!graph) return
@@ -414,7 +417,7 @@ function initGraph() {
     const item=model.value.entities.find((e)=>e.id===node.id)
     if(item) item.layout={x:node.position().x,y:node.position().y}
   })
-  drawGraph()
+  drawGraph(true)
 }
 function resizeGraph() {
   if (graph && graphHost.value) graph.resize(graphHost.value.clientWidth,graphHost.value.clientHeight)
@@ -438,7 +441,7 @@ function applyImport() {
   try {
     const parsed=importYaml(importText.value)
     model.value=parsed.model;selectedId.value=undefined;selectedRelationId.value=undefined
-    drawGraph();importOpen.value=false
+    drawGraph(true);importOpen.value=false
     notify(`导入完成：${proxies.value.length} proxies · ${groups.value.length} groups · ${providers.value.length} providers`)
   } catch(error) { notify(error instanceof Error?error.message:'YAML 解析失败') }
 }
@@ -447,7 +450,7 @@ function applySource() {
   try {
     const parsed=importYaml(sourceText.value)
     model.value=parsed.model;selectedId.value=undefined;selectedRelationId.value=undefined
-    drawGraph();sourceOpen.value=false;notify('源码已同步到拓扑')
+    drawGraph(true);sourceOpen.value=false;notify('源码已同步到拓扑')
   } catch(error) { notify(error instanceof Error?error.message:'YAML 解析失败') }
 }
 function focusIssue(issue: ValidationIssue) {
