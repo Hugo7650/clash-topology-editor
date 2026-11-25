@@ -90,7 +90,7 @@ function isValidProxyPort(value: unknown): boolean {
 
 function isValidProxyPortRange(value: unknown): boolean {
   if (typeof value !== 'string') return false
-  const match = value.trim().match(/^(\\d+)-(\\d+)$/)
+  const match = value.trim().match(/^(\d+)-(\d+)$/)
   if (!match) return false
   const start = Number(match[1])
   const end = Number(match[2])
