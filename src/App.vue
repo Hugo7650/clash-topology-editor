@@ -6,9 +6,11 @@ import {
   removeEntity, removeRelation, resolveMissingEntity, validateModel,
   type ClashModel, type ConfigEntity, type ConfigRelation, type EntityKind, type ValidationIssue,
 } from './core/model'
+import { mihomoFieldsFor, type MihomoFieldDoc, type MihomoResourceKind } from './core/mihomo-schema'
 
 const model = ref<ClashModel>(createDemoModel())
 const theme = ref<'dark'|'light'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-theme') === 'light' ? 'light' : 'dark')
+const language = ref<'zh'|'en'>(typeof window !== 'undefined' && window.localStorage.getItem('clash-topology-language') === 'en' ? 'en' : 'zh')
 const graphHost = ref<HTMLDivElement | null>(null)
 const selectedId = ref<string>()
 const selectedRelationId = ref<string>()
@@ -32,6 +34,13 @@ const providers = computed(() => model.value.entities.filter((item) => item.kind
 const issues = computed(() => validateModel(model.value))
 const errors = computed(() => issues.value.filter((item) => item.level === 'error').length)
 const warnings = computed(() => issues.value.filter((item) => item.level === 'warning').length)
+const documentedFields = computed(() => {
+  const item = selected.value
+  if (!item || !['proxy', 'group', 'provider'].includes(item.kind)) return []
+  return mihomoFieldsFor(item.kind as MihomoResourceKind, String(item.raw.type ?? ''))
+    .filter((field) => !['name', 'type', 'server', 'port', 'dialer-proxy', 'proxies', 'use', 'proxy'].includes(field.key))
+})
+const displayedNotice = computed(() => notice.value === '就绪' ? tr('就绪', 'Ready') : notice.value)
 const memberRelations = computed(() => selected.value?.kind === 'group'
   ? model.value.relations.filter((r) => r.targetId === selected.value!.id && r.kind === 'member').sort((a,b) => a.order-b.order)
   : [])
@@ -40,23 +49,56 @@ const providerRelations = computed(() => selected.value?.kind === 'group'
   : [])
 const selectedMembers = computed(() => memberRelations.value.map((r) => ({ relation: r, entity: model.value.entities.find((e) => e.id === r.sourceId) })).filter((x): x is {relation: ConfigRelation; entity: ConfigEntity} => Boolean(x.entity)))
 const selectedProviders = computed(() => providerRelations.value.map((r) => ({ relation: r, entity: model.value.entities.find((e) => e.id === r.sourceId) })).filter((x): x is {relation: ConfigRelation; entity: ConfigEntity} => Boolean(x.entity)))
-const protocolFields = computed(() => {
-  const type = String(selected.value?.raw.type ?? 'ss')
-  const fields: Record<string, string[]> = {
-    ss: ['cipher','password'], vmess: ['uuid','alterId','cipher','tls','servername','network'],
-    vless: ['uuid','flow','tls','servername','network'], trojan: ['password','sni','alpn','network'],
-    hysteria2: ['password','sni','obfs','obfs-password','up','down'],
-    tuic: ['uuid','password','congestion-controller','udp-relay-mode','sni'],
-    socks5: ['username','password','tls','udp'], http: ['username','password','tls'],
-    wireguard: ['ip','private-key','public-key','mtu'],
-  }
-  return fields[type] ?? []
-})
 
 const sampleYaml = `proxies:\n  - name: HK-01\n    type: ss\n    server: hk.example.com\n    port: 443\n    cipher: aes-128-gcm\n    password: change-me\n  - name: JP-01\n    type: vless\n    server: jp.example.com\n    port: 443\n    uuid: 00000000-0000-4000-8000-000000000000\n    tls: true\nproxy-providers:\n  provider-hk:\n    type: http\n    url: https://example.com/hk.yaml\n    path: ./providers/hk.yaml\n    interval: 3600\n  provider-jp:\n    type: file\n    path: ./providers/jp.yaml\nproxy-groups:\n  - name: 默认出口\n    type: select\n    proxies: [节点选择, DIRECT]\n  - name: 节点选择\n    type: select\n    proxies: [香港自动选择, 日本自动选择]\n  - name: 香港自动选择\n    type: url-test\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n    proxies: [HK-01]\n    use: [provider-hk]\n  - name: 日本自动选择\n    type: url-test\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n    proxies: [JP-01]\n    use: [provider-jp]\n`
 
 function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
+}
+function toggleLanguage() {
+  language.value = language.value === 'zh' ? 'en' : 'zh'
+}
+function tr(zh: string, en: string) {
+  return language.value === 'zh' ? zh : en
+}
+function getDocumentedField(key: string): unknown {
+  if (!selected.value) return undefined
+  return key.split('.').reduce<unknown>((value, part) => {
+    if (!value || typeof value !== 'object') return undefined
+    return (value as Record<string, unknown>)[part]
+  }, selected.value.raw)
+}
+function setDocumentedField(key: string, value: unknown) {
+  const item = selected.value
+  if (!item) return
+  const parts = key.split('.')
+  const leaf = parts.pop()!
+  let target = item.raw as Record<string, unknown>
+  for (const part of parts) {
+    if (!target[part] || typeof target[part] !== 'object' || Array.isArray(target[part])) target[part] = {}
+    target = target[part] as Record<string, unknown>
+  }
+  if (value === undefined || value === null || value === '') delete target[leaf]
+  else target[leaf] = value
+  if (item.kind === 'proxy') refreshNode(item)
+}
+function updateDocumentedField(field: MihomoFieldDoc, value: string | boolean) {
+  if (field.type === 'number') {
+    setDocumentedField(field.key, value === '' ? undefined : Number(value))
+  } else {
+    setDocumentedField(field.key, value)
+  }
+}
+function updateDocumentedJsonField(field: MihomoFieldDoc, value: string) {
+  try {
+    setDocumentedField(field.key, value.trim() ? JSON.parse(value) : undefined)
+  } catch {
+    notify(tr(`字段 ${field.key} 的 JSON 格式无效`, `Invalid JSON for field ${field.key}`))
+  }
+}
+function documentedFieldText(field: MihomoFieldDoc) {
+  const value = getDocumentedField(field.key)
+  return value === undefined ? '' : JSON.stringify(value, null, 2)
 }
 function notify(message: string) {
   notice.value = message
@@ -79,11 +121,11 @@ function labelFor(item: ConfigEntity) {
   const type = item.kind === 'group' ? String(item.raw.type ?? 'group')
     : item.kind === 'provider' ? `${String(item.raw.type ?? 'provider')} provider`
     : item.kind === 'proxy' ? String(item.raw.type ?? 'proxy')
-    : item.kind === 'builtin' ? '内置出口' : '未解析引用'
+    : item.kind === 'builtin' ? tr('内置出口', 'Built-in') : tr('未解析引用', 'Unresolved reference')
   const suffix = item.kind === 'group'
-    ? `${model.value.relations.filter((r) => r.targetId === item.id).length} 个关联`
+    ? `${model.value.relations.filter((r) => r.targetId === item.id).length} ${tr('个关联', 'references')}`
     : item.kind === 'proxy' ? String(item.raw.server ?? '')
-    : item.kind === 'provider' ? '动态节点池' : ''
+    : item.kind === 'provider' ? tr('动态节点池', 'Dynamic node pool') : ''
   return `${item.name}\n${type}${suffix ? ` · ${suffix}` : ''}`
 }
 function nodeMeta(item: ConfigEntity) {
@@ -361,6 +403,10 @@ watch(theme, async (value) => {
   await nextTick()
   initGraph()
 })
+watch(language, (value) => {
+  window.localStorage.setItem('clash-topology-language', value)
+  drawGraph()
+})
 onMounted(()=>{initGraph();window.addEventListener('resize',resizeGraph)})
 onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.clearTimeout(noticeTimer);graph?.dispose();graph=null})
 </script>
@@ -373,15 +419,16 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
         <div><div class="brand-title">Clash Topology</div><div class="brand-subtitle">VISUAL CONFIG EDITOR</div></div>
       </div>
       <div class="topbar-actions">
-        <button class="button button-quiet theme-toggle" @click="toggleTheme" :aria-label="theme === 'dark' ? '切换亮色主题' : '切换深色主题'">{{ theme === 'dark' ? '☀ 亮色主题' : '☾ 深色主题' }}</button>
+        <button class="button button-quiet theme-toggle" @click="toggleTheme" :aria-label="theme === 'dark' ? tr('切换亮色主题','Switch to light theme') : tr('切换深色主题','Switch to dark theme')">{{ theme === 'dark' ? `☀ ${tr('亮色主题','Light')}` : `☾ ${tr('深色主题','Dark')}` }}</button>
+        <button class="button button-quiet language-toggle" @click="toggleLanguage" :aria-label="tr('切换为英文','Switch to Chinese')">{{ language === 'zh' ? 'EN' : '中文' }}</button>
         <span class="engine-pill"><i></i> Mihomo · YAML Fragment</span>
-        <button class="button button-quiet" @click="openImport">↑ 导入 YAML</button>
-        <button class="button button-quiet" @click="openSource">{ } 源码模式</button>
+        <button class="button button-quiet" @click="openImport">↑ {{ tr('导入 YAML','Import YAML') }}</button>
+        <button class="button button-quiet" @click="openSource">{ } {{ tr('源码模式','Source') }}</button>
         <div class="export-wrap">
-          <button class="button button-primary" @click="exportMenuOpen=!exportMenuOpen">↓ 导出 YAML</button>
+          <button class="button button-primary" @click="exportMenuOpen=!exportMenuOpen">↓ {{ tr('导出 YAML','Export YAML') }}</button>
           <div v-if="exportMenuOpen" class="export-menu">
-            <button @click="exportAll">导出全部配置片段</button>
-            <button :disabled="selected?.kind!=='group'" @click="exportSelected">导出选中策略组及依赖</button>
+            <button @click="exportAll">{{ tr('导出全部配置片段','Export all config fragments') }}</button>
+            <button :disabled="selected?.kind!=='group'" @click="exportSelected">{{ tr('导出选中策略组及依赖','Export selected group and dependencies') }}</button>
           </div>
         </div>
       </div>
@@ -389,68 +436,67 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
 
     <section class="workspace">
       <aside class="left-panel panel">
-        <div class="panel-heading"><div><div class="eyebrow">WORKSPACE</div><h2>配置资源</h2></div><span class="count-chip">{{ proxies.length+groups.length+providers.length }}</span></div>
+        <div class="panel-heading"><div><div class="eyebrow">WORKSPACE</div><h2>{{ tr('配置资源','Resources') }}</h2></div><span class="count-chip">{{ proxies.length+groups.length+providers.length }}</span></div>
         <div class="create-actions">
-          <button class="create-tile proxy-tile" @click="add('proxy')"><b>＋</b><span><strong>Proxy</strong><small>代理节点</small></span></button>
-          <button class="create-tile group-tile" @click="add('group')"><b>＋</b><span><strong>Group</strong><small>策略组</small></span></button>
-          <button class="create-tile provider-tile" @click="add('provider')"><b>＋</b><span><strong>Provider</strong><small>订阅提供者</small></span></button>
+          <button class="create-tile proxy-tile" @click="add('proxy')"><b>＋</b><span><strong>Proxy</strong><small>{{ tr('代理节点','Proxy node') }}</small></span></button>
+          <button class="create-tile group-tile" @click="add('group')"><b>＋</b><span><strong>Group</strong><small>{{ tr('策略组','Proxy group') }}</small></span></button>
+          <button class="create-tile provider-tile" @click="add('provider')"><b>＋</b><span><strong>Provider</strong><small>{{ tr('订阅提供者','Proxy provider') }}</small></span></button>
         </div>
         <div class="resource-list">
           <section class="resource-section">
             <div class="section-title"><i class="legend-dot proxy-dot"></i> PROXIES <span>{{ proxies.length }}</span></div>
             <button v-for="item in proxies" :key="item.id" class="resource-item" :class="{active:selectedId===item.id}" @click="selectEntity(item.id)"><i class="resource-icon proxy-icon">P</i><span>{{ item.name }}</span><small>{{ item.raw.type }}</small></button>
-            <div v-if="!proxies.length" class="empty-list">还没有代理节点</div>
+            <div v-if="!proxies.length" class="empty-list">{{ tr('还没有代理节点','No proxy nodes yet') }}</div>
           </section>
           <section class="resource-section">
             <div class="section-title"><i class="legend-dot group-dot"></i> PROXY GROUPS <span>{{ groups.length }}</span></div>
             <button v-for="item in groups" :key="item.id" class="resource-item" :class="{active:selectedId===item.id}" @click="selectEntity(item.id)"><i class="resource-icon group-icon">G</i><span>{{ item.name }}</span><small>{{ item.raw.type }}</small></button>
-            <div v-if="!groups.length" class="empty-list">还没有策略组</div>
+            <div v-if="!groups.length" class="empty-list">{{ tr('还没有策略组','No proxy groups yet') }}</div>
           </section>
           <section class="resource-section">
             <div class="section-title"><i class="legend-dot provider-dot"></i> PROVIDERS <span>{{ providers.length }}</span></div>
             <button v-for="item in providers" :key="item.id" class="resource-item" :class="{active:selectedId===item.id}" @click="selectEntity(item.id)"><i class="resource-icon provider-icon">D</i><span>{{ item.name }}</span><small>{{ item.raw.type }}</small></button>
-            <div v-if="!providers.length" class="empty-list">还没有 Provider</div>
+            <div v-if="!providers.length" class="empty-list">{{ tr('还没有 Provider','No providers yet') }}</div>
           </section>
         </div>
-        <div class="sidebar-foot"><i></i> 本地编辑 · 未连接运行内核</div>
+        <div class="sidebar-foot"><i></i> {{ tr('本地编辑 · 未连接运行内核','Local editing · No core connection') }}</div>
       </aside>
 
       <section class="center-panel">
         <div class="canvas-toolbar">
-          <div><div class="canvas-title">拓扑画布</div><div class="canvas-subtitle">从依赖节点拖线到引用它的 Group · Group 支持嵌套</div></div>
+          <div><div class="canvas-title">{{ tr('拓扑画布','Topology canvas') }}</div><div class="canvas-subtitle">{{ tr('从依赖节点拖线到引用它的 Group · Group 支持嵌套','Connect from a dependency to its referencing group · Nested groups supported') }}</div></div>
           <div class="canvas-tools">
             <span><i class="legend-dot proxy-dot"></i> Proxy</span><span><i class="legend-dot group-dot"></i> Group</span><span><i class="legend-dot provider-dot"></i> Provider</span>
-            <button class="icon-button" title="适应画布" @click="graph?.zoomToFit({padding:48,maxScale:1})">⌗</button>
-            <button class="icon-button" title="删除选中" :disabled="!selected && !selectedRelation" @click="deleteSelected">⌫</button>
+            <button class="icon-button"  :title="tr('适应画布','Fit canvas')" @click="graph?.zoomToFit({padding:48,maxScale:1})">⌗</button>
+            <button class="icon-button"  :title="tr('删除选中','Delete selection')" :disabled="!selected && !selectedRelation" @click="deleteSelected">⌫</button>
           </div>
         </div>
         <div class="canvas-area">
           <div ref="graphHost" class="graph-host"></div>
-          <div class="canvas-hint"><kbd>拖线</kbd> 从依赖节点连到引用它的 Group <span>·</span> 滚轮缩放 <span>·</span> 按住鼠标中键拖动画布</div>
+          <div class="canvas-hint"><kbd>{{ tr('拖线','Connect') }}</kbd> {{ tr('从依赖节点连到引用它的 Group','from a dependency to its referencing group') }} <span>·</span> {{ tr('滚轮缩放','Scroll to zoom') }} <span>·</span> {{ tr('按住鼠标中键拖动画布','Hold middle mouse to pan') }}</div>
           <div class="canvas-stats">{{ proxies.length }} proxies <i></i> {{ groups.length }} groups <i></i> {{ providers.length }} providers</div>
         </div>
         <div class="yaml-preview-panel">
-          <div class="yaml-preview-head"><div><b><span>{ }</span> YAML 预览</b><small>当前完整片段 · 实时序列化</small></div><button class="text-button" @click="openSource">打开源码编辑器 ↗</button></div>
+          <div class="yaml-preview-head"><div><b><span>{ }</span> {{ tr('YAML 预览','YAML preview') }}</b><small>{{ tr('当前完整片段 · 实时序列化','Full fragment · Live serialization') }}</small></div><button class="text-button" @click="openSource">{{ tr('打开源码编辑器 ↗','Open source editor ↗') }}</button></div>
           <pre>{{ exportYaml(model) || '# 暂无配置' }}</pre>
         </div>
       </section>
 
       <aside class="right-panel panel">
-        <div class="panel-heading"><div><div class="eyebrow">INSPECTOR</div><h2>属性编辑</h2></div><button v-if="selected && selected.kind!=='builtin'" class="delete-small" @click="deleteSelected">⌫</button></div>
+        <div class="panel-heading"><div><div class="eyebrow">INSPECTOR</div><h2>{{ tr('属性编辑','Inspector') }}</h2></div><button v-if="selected && selected.kind!=='builtin'" class="delete-small" @click="deleteSelected">⌫</button></div>
         <template v-if="selected">
           <div class="selected-kind" :class="`${selected.kind}-kind`"><i></i>{{ selected.kind==='proxy'?'PROXY NODE':selected.kind==='group'?'PROXY GROUP':selected.kind==='provider'?'PROXY PROVIDER':selected.kind==='builtin'?'BUILT-IN':'UNRESOLVED REFERENCE' }}</div>
           <div class="inspector-scroll">
             <section class="form-section">
-              <div class="form-section-title">基本信息</div>
-              <label class="field-label">名称</label>
+              <div class="form-section-title">{{ tr('基本信息','Basic information') }}</div>
+              <label class="field-label">{{ tr('名称','Name') }}</label>
               <input class="text-input" :value="selected.name" :disabled="selected.kind==='builtin'||selected.kind==='missing'" @change="rename(($event.target as HTMLInputElement).value)" />
 
               <template v-if="selected.kind==='proxy'">
-                <label class="field-label">协议类型</label>
+                <label class="field-label">{{ tr('协议类型','Protocol type') }}</label>
                 <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in ['ss','vmess','vless','trojan','hysteria2','tuic','socks5','http','wireguard','snell','ssh']" :key="type">{{ type }}</option></select>
-                <div class="two-fields"><div><label class="field-label">服务器</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div><label class="field-label">端口</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
-                <label class="field-label">拨号代理（dialer-proxy）</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">不使用</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
-                <template v-for="field in protocolFields" :key="field">
+                <div class="two-fields"><div><label class="field-label">{{ tr('服务器','Server') }}</label><input class="text-input" :value="selected.raw.server as string" placeholder="example.com" @change="patchRaw('server',($event.target as HTMLInputElement).value)" /></div><div><label class="field-label">{{ tr('端口','Port') }}</label><input class="text-input" type="number" :value="selected.raw.port as number" placeholder="443" @change="patchRaw('port',Number(($event.target as HTMLInputElement).value))" /></div></div>
+                <label class="field-label">{{ tr('拨号代理（dialer-proxy）','Dialer proxy (dialer-proxy)') }}</label><select class="text-input" :value="dependencyName(selected.id,'dialer')" @change="setDependency(selected.id,'dialer',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('不使用','Disabled') }}</option><option v-for="proxy in proxies.filter(p=>p.id!==selected!.id)" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
                   <label class="field-label">{{ field }}</label>
                   <label v-if="['tls','udp','tfo','mptcp'].includes(field)" class="switch-row"><span>{{ field }}</span><input type="checkbox" :checked="Boolean(selected.raw[field])" @change="patchRaw(field,($event.target as HTMLInputElement).checked)" /><i></i></label>
                   <input v-else class="text-input" :type="['alterId','up','down','mtu'].includes(field)?'number':'text'" :value="selected.raw[field] as string|number" :placeholder="field" @change="patchRaw(field,['alterId','up','down','mtu'].includes(field)?Number(($event.target as HTMLInputElement).value):($event.target as HTMLInputElement).value)" />
@@ -458,88 +504,100 @@ onBeforeUnmount(()=>{window.removeEventListener('resize',resizeGraph);window.cle
               </template>
 
               <template v-else-if="selected.kind==='group'">
-                <label class="field-label">策略类型</label>
+                <label class="field-label">{{ tr('策略类型','Group type') }}</label>
                 <select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option v-for="type in ['select','url-test','fallback','load-balance','relay']" :key="type">{{ type }}</option></select>
-                <template v-if="['url-test','fallback','load-balance'].includes(String(selected.raw.type))">
                   <label class="field-label">测速 URL</label><input class="text-input" :value="selected.raw.url as string" placeholder="https://www.gstatic.com/generate_204" @change="patchRaw('url',($event.target as HTMLInputElement).value)" />
                   <div class="two-fields"><div><label class="field-label">Interval</label><input class="text-input" type="number" :value="selected.raw.interval as number" @change="patchRaw('interval',Number(($event.target as HTMLInputElement).value))" /></div><div v-if="selected.raw.type==='url-test'"><label class="field-label">Tolerance</label><input class="text-input" type="number" :value="selected.raw.tolerance as number" @change="patchRaw('tolerance',Number(($event.target as HTMLInputElement).value))" /></div></div>
                 </template>
-                <template v-if="selected.raw.type==='load-balance'"><label class="field-label">Strategy</label><select class="text-input" :value="selected.raw.strategy??'consistent-hashing'" @change="patchRaw('strategy',($event.target as HTMLSelectElement).value)"><option>consistent-hashing</option><option>round-robin</option><option>sticky-sessions</option></select></template>
-                <div class="switch-list"><label v-for="field in ['lazy','include-all','include-all-proxies','include-all-providers','hidden']" :key="field" class="switch-row"><span>{{ field }}</span><input type="checkbox" :checked="Boolean(selected.raw[field])" @change="patchRaw(field,($event.target as HTMLInputElement).checked)" /><i></i></label></div>
-                <template v-if="selected.raw['include-all']||selected.raw['include-all-proxies']||selected.raw['include-all-providers']"><label class="field-label">Filter</label><input class="text-input" :value="selected.raw.filter as string" @change="patchRaw('filter',($event.target as HTMLInputElement).value)" /><label class="field-label">Exclude Filter</label><input class="text-input" :value="selected.raw['exclude-filter'] as string" @change="patchRaw('exclude-filter',($event.target as HTMLInputElement).value)" /></template>
               </template>
 
               <template v-else-if="selected.kind==='provider'">
-                <label class="field-label">Provider 类型</label><select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option value="http">http</option><option value="file">file</option><option value="inline">inline</option></select>
-                <label class="field-label">下载代理（proxy）</label><select class="text-input" :value="dependencyName(selected.id,'provider-proxy')" @change="setDependency(selected.id,'provider-proxy',($event.target as HTMLSelectElement).value)"><option value="">直连 / 不指定</option><option v-for="proxy in proxies" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
-                <template v-if="selected.raw.type==='http'"><label class="field-label">订阅 URL</label><input class="text-input" :value="selected.raw.url as string" placeholder="https://example.com/sub.yaml" @change="patchRaw('url',($event.target as HTMLInputElement).value)" /><label class="field-label">本地 Path</label><input class="text-input" :value="selected.raw.path as string" placeholder="./providers/name.yaml" @change="patchRaw('path',($event.target as HTMLInputElement).value)" /><label class="field-label">更新间隔（秒）</label><input class="text-input" type="number" :value="selected.raw.interval as number" @change="patchRaw('interval',Number(($event.target as HTMLInputElement).value))" /></template>
-                <template v-else-if="selected.raw.type==='file'"><label class="field-label">本地 Path</label><input class="text-input" :value="selected.raw.path as string" @change="patchRaw('path',($event.target as HTMLInputElement).value)" /></template>
-                <template v-else><label class="field-label">Inline Payload（JSON）</label><textarea class="text-input textarea-small" :value="JSON.stringify(selected.raw.payload??[],null,2)" @change="parsePayload" /></template>
+                <label class="field-label">{{ tr('Provider 类型','Provider type') }}</label><select class="text-input" :value="selected.raw.type" @change="patchRaw('type',($event.target as HTMLSelectElement).value)"><option value="http">http</option><option value="file">file</option><option value="inline">inline</option></select>
+                <label class="field-label">{{ tr('下载代理（proxy）','Download proxy (proxy)') }}</label><select class="text-input" :value="dependencyName(selected.id,'provider-proxy')" @change="setDependency(selected.id,'provider-proxy',($event.target as HTMLSelectElement).value)"><option value="">{{ tr('直连 / 不指定','Direct / Unspecified') }}</option><option v-for="proxy in proxies" :key="proxy.id" :value="proxy.name">{{ proxy.name }}</option></select>
               </template>
-              <div v-else-if="selected.kind==='missing'" class="missing-resolver"><p class="warning-copy">该引用在当前配置片段中没有对应实体。选择它在配置中的真实类型以创建占位定义。</p><button class="button button-secondary button-full" @click="resolveSelectedMissing('proxy')">解析为 Proxy</button><button class="button button-secondary button-full" @click="resolveSelectedMissing('group')">解析为 Proxy Group</button><button class="button button-secondary button-full" @click="resolveSelectedMissing('provider')">解析为 Provider</button></div>
-              <p v-else class="muted-copy">内置代理由 Clash / Mihomo 内核提供，无需在片段中定义。</p>
+              <div v-else-if="selected.kind==='missing'" class="missing-resolver"><p class="warning-copy">{{ tr('该引用在当前配置片段中没有对应实体。选择它在配置中的真实类型以创建占位定义。','This reference has no matching entity in the current fragment. Choose its actual config type to create a placeholder.') }}</p><button class="button button-secondary button-full" @click="resolveSelectedMissing('proxy')">{{ tr('解析为 Proxy','Resolve as Proxy') }}</button><button class="button button-secondary button-full" @click="resolveSelectedMissing('group')">{{ tr('解析为 Proxy Group','Resolve as Proxy Group') }}</button><button class="button button-secondary button-full" @click="resolveSelectedMissing('provider')">{{ tr('解析为 Provider','Resolve as Provider') }}</button></div>
+              <p v-else class="muted-copy">{{ tr('内置代理由 Clash / Mihomo 内核提供，无需在片段中定义。','Built-in proxies are provided by the Clash / Mihomo core and do not need to be defined in this fragment.') }}</p>
             </section>
 
-            <template v-if="selected.kind==='group'">
+                         <section v-if="documentedFields.length" class="form-section mihomo-fields-section">
+               <div class="form-section-head">
+                 <div class="form-section-title">{{ tr('Mihomo 文档配置项','Mihomo documented fields') }}</div>
+                 <a class="field-doc-link section-doc-link" :href="selected.kind==='proxy' ? 'https://wiki.metacubex.one/config/proxies/' : selected.kind==='group' ? 'https://wiki.metacubex.one/config/proxy-groups/' : 'https://wiki.metacubex.one/config/proxy-providers/'" target="_blank" rel="noopener noreferrer">Mihomo Docs ↗</a>
+               </div>
+               <p class="muted-copy">{{ tr('字段名和 YAML 键保持 Mihomo 原生写法；说明来自官方文档。复杂对象可在此编辑 JSON。','Field names remain native Mihomo YAML keys. Descriptions are based on official docs; edit complex values as JSON.') }}</p>
+               <div v-for="field in documentedFields" :key="field.key" class="documented-field">
+                 <div class="documented-field-head">
+                   <code>{{ field.key }}</code>
+                   <span v-if="field.deprecated" class="deprecated-chip">{{ tr('已弃用','Deprecated') }}</span>
+                   <a class="field-doc-link" :href="field.docs" target="_blank" rel="noopener noreferrer">{{ tr('文档','Docs') }} ↗</a>
+                 </div>
+                 <p class="field-doc-description">{{ language === 'zh' ? field.zh : field.en }}</p>
+                 <label v-if="field.type==='boolean'" class="switch-row documented-switch"><span>{{ field.key }}</span><input type="checkbox" :checked="Boolean(getDocumentedField(field.key))" @change="updateDocumentedField(field,($event.target as HTMLInputElement).checked)" /><i></i></label>
+                 <textarea v-else-if="field.type==='json'" class="text-input textarea-small documented-json" :value="documentedFieldText(field)" :placeholder="field.key==='payload' ? '[...]' : '{ ... } / [ ... ]'" spellcheck="false" @change="updateDocumentedJsonField(field,($event.target as HTMLTextAreaElement).value)" />
+                 <input v-else class="text-input" :type="field.type==='number'?'number':'text'" :value="String(getDocumentedField(field.key) ?? '')" :placeholder="field.key" @change="updateDocumentedField(field,($event.target as HTMLInputElement).value)" />
+               </div>
+             </section>
+
+<template v-if="selected.kind==='group'">
               <section class="form-section relation-section">
-                <div class="form-section-head"><div class="form-section-title">策略组成员 <small>{{ selectedMembers.length }}</small></div><em>proxies</em></div>
+                <div class="form-section-head"><div class="form-section-title">{{ tr('策略组成员','Group members') }} <small>{{ selectedMembers.length }}</small></div><em>proxies</em></div>
                 <div v-if="selectedMembers.length" class="member-list">
                   <div v-for="(entry,index) in selectedMembers" :key="entry.relation.id" class="member-row">
                     <i class="member-dot" :class="`${entry.entity.kind}-dot`"></i><span>{{ entry.entity.name }}</span><small>{{ entry.entity.kind==='group'?'GROUP':entry.entity.kind==='builtin'?'BUILT-IN':'PROXY' }}</small>
                     <button :disabled="index===0" @click="reorder(entry.relation.id,-1)">↑</button><button :disabled="index===selectedMembers.length-1" @click="reorder(entry.relation.id,1)">↓</button><button class="remove-member" @click="toggleMember(selected!.id,entry.entity.id)">×</button>
                   </div>
-                </div><div v-else class="empty-members">暂无成员，请从下方勾选或在画布连线</div>
+                </div><div v-else class="empty-members">{{ tr('暂无成员，请从下方勾选或在画布连线','No members yet. Select below or connect nodes on the canvas.') }}</div>
                 <div class="member-picker">
                   <label v-for="item in [...proxies,...groups.filter(g=>g.id!==selected!.id),...model.entities.filter(e=>e.kind==='builtin')]" :key="item.id"><input type="checkbox" :checked="model.relations.some(r=>r.sourceId===item.id&&r.targetId===selected!.id&&r.kind==='member')" @change="toggleMember(selected!.id,item.id)" /><span>{{ item.name }}</span><small>{{ item.kind.toUpperCase() }}</small></label>
                 </div>
               </section>
               <section class="form-section relation-section">
-                <div class="form-section-head"><div class="form-section-title">Provider 引用 <small>{{ selectedProviders.length }}</small></div><em>use</em></div>
+                <div class="form-section-head"><div class="form-section-title">{{ tr('Provider 引用','Provider references') }} <small>{{ selectedProviders.length }}</small></div><em>use</em></div>
                 <div v-for="entry in selectedProviders" :key="entry.relation.id" class="member-row"><i class="member-dot provider-dot"></i><span>{{ entry.entity.name }}</span><small>PROVIDER</small><button class="remove-member" @click="toggleMember(selected!.id,entry.entity.id)">×</button></div>
                 <div class="member-picker"><label v-for="item in providers" :key="item.id"><input type="checkbox" :checked="model.relations.some(r=>r.sourceId===item.id&&r.targetId===selected!.id&&r.kind==='provider-use')" @change="toggleMember(selected!.id,item.id)" /><span>{{ item.name }}</span><small>PROVIDER</small></label><div v-if="!providers.length" class="empty-members">暂无 Provider</div></div>
               </section>
             </template>
 
             <section v-if="selected.kind==='proxy'||selected.kind==='group'||selected.kind==='provider'" class="form-section advanced-section">
-              <div class="form-section-head"><div class="form-section-title">高级 / 未知字段</div><em>JSON</em></div>
-              <p class="muted-copy">不认识的属性会保留。不能在这里修改 name、proxies、use 关系字段。</p>
+              <div class="form-section-head"><div class="form-section-title">{{ tr('高级 / 未知字段','Advanced / unknown fields') }}</div><em>JSON</em></div>
+              <p class="muted-copy">{{ tr('不认识的属性会保留。不能在这里修改 name、proxies、use 关系字段。','Unknown properties are preserved. name, proxies, and use relationship fields cannot be edited here.') }}</p>
               <textarea v-model="advancedText" class="code-editor" spellcheck="false"></textarea>
               <div v-if="advancedError" class="inline-error">{{ advancedError }}</div>
-              <button class="button button-secondary button-full" @click="applyAdvanced">应用高级属性</button>
+              <button class="button button-secondary button-full" @click="applyAdvanced">{{ tr('应用高级属性','Apply advanced fields') }}</button>
             </section>
           </div>
         </template>
         <template v-else-if="selectedRelation">
           <div class="selected-kind relation-kind"><i></i> REFERENCE EDGE</div>
-          <section class="form-section"><div class="form-section-title">引用关系</div><div class="relation-summary"><b>{{ model.entities.find(e=>e.id===selectedRelation!.sourceId)?.name }}</b><span>→</span><b>{{ model.entities.find(e=>e.id===selectedRelation!.targetId)?.name }}</b></div><p class="muted-copy">{{ selectedRelation.kind==='provider-use'?'Provider 通过策略组 use 字段引入。':'代理或子策略组通过父策略组 proxies 字段引用。' }}</p><button class="button button-danger button-full" @click="deleteSelected">删除这条引用</button></section>
+          <section class="form-section"><div class="form-section-title">{{ tr('引用关系','Reference') }}</div><div class="relation-summary"><b>{{ model.entities.find(e=>e.id===selectedRelation!.sourceId)?.name }}</b><span>→</span><b>{{ model.entities.find(e=>e.id===selectedRelation!.targetId)?.name }}</b></div><p class="muted-copy">{{ selectedRelation.kind==='provider-use' ? tr('Provider 通过策略组 use 字段引入。','Provider is referenced through the group use field.') : tr('代理或子策略组通过父策略组 proxies 字段引用。','A proxy or nested group is referenced through the parent group proxies field.') }}</p><button class="button button-danger button-full" @click="deleteSelected">{{ tr('删除这条引用','Delete this reference') }}</button></section>
         </template>
-        <div v-else class="inspector-empty"><div class="empty-illustration"><i></i><b></b><span>◇</span></div><h3>选择一个节点</h3><p>点击拓扑节点或左侧资源，查看并编辑 Clash 配置属性。</p><div class="empty-tip">从节点右侧端口拖线到策略组左侧端口，可以建立引用关系。</div></div>
+        <div v-else class="inspector-empty"><div class="empty-illustration"><i></i><b></b><span>◇</span></div><h3>{{ tr('选择一个节点','Select a node') }}</h3><p>{{ tr('点击拓扑节点或左侧资源，查看并编辑 Clash 配置属性。','Select a topology node or a resource on the left to inspect and edit its Clash configuration.') }}</p><div class="empty-tip">{{ tr('从节点右侧端口拖线到策略组左侧端口，可以建立引用关系。','Drag from a node’s right port to a group’s left port to create a reference.') }}</div></div>
 
         <div class="validation-panel">
-          <div class="validation-head"><b>配置检查</b><span><i>{{ errors }} 错误</i><em>{{ warnings }} 警告</em></span></div>
+          <div class="validation-head"><b>{{ tr('配置检查','Validation') }}</b><span><i>{{ errors }} {{ tr('错误','errors') }}</i><em>{{ warnings }} {{ tr('警告','warnings') }}</em></span></div>
           <div v-if="issues.length" class="issue-list"><button v-for="(issue,index) in issues.slice(0,5)" :key="`${issue.entityId}-${index}`" class="issue-item" @click="focusIssue(issue)"><i :class="issue.level"></i><span>{{ issue.message }}</span><small>↗</small></button></div>
-          <div v-else class="all-valid">✓ 当前未发现明显问题</div>
+          <div v-else class="all-valid">✓ {{ tr('当前未发现明显问题','No obvious issues found') }}</div>
         </div>
       </aside>
     </section>
 
-    <footer class="statusbar"><span><i></i>{{ notice }}</span><small>{{ errors }} errors · {{ warnings }} warnings <b>·</b> AntV X6 3.x <b>·</b> {{ model.engine }}</small></footer>
+    <footer class="statusbar"><span><i></i>{{ displayedNotice }}</span><small>{{ errors }} errors · {{ warnings }} warnings <b>·</b> AntV X6 3.x <b>·</b> {{ model.engine }}</small></footer>
 
     <div v-if="importOpen" class="modal-backdrop" @click.self="importOpen=false">
       <section class="modal">
-        <div class="modal-head"><div><div class="eyebrow">YAML IMPORT</div><h2>导入 Clash 配置片段</h2></div><button class="close-button" @click="importOpen=false">×</button></div>
-        <p>粘贴 YAML 或选择文件。导入后将替换画布中的 proxies、proxy-groups 和 proxy-providers。</p>
-        <div class="file-row"><input ref="fileInput" type="file" accept=".yaml,.yml,text/yaml,text/plain" @change="readFile" /><button class="button button-secondary" @click="fileInput?.click()">选择 YAML 文件</button><small>支持 .yaml / .yml</small></div>
-        <textarea v-model="importText" class="large-code-editor" spellcheck="false" placeholder="粘贴配置片段..." />
-        <div class="modal-foot"><small>只处理三个核心配置片段；其他顶层配置不会导出。</small><div><button class="button button-quiet" @click="importOpen=false">取消</button><button class="button button-primary" @click="applyImport">解析并导入</button></div></div>
+        <div class="modal-head"><div><div class="eyebrow">YAML IMPORT</div><h2>{{ tr('导入 Clash 配置片段','Import Clash fragment') }}</h2></div><button class="close-button" @click="importOpen=false">×</button></div>
+        <p>{{ tr('粘贴 YAML 或选择文件。导入后将替换画布中的 proxies、proxy-groups 和 proxy-providers。','Paste YAML or choose a file. Import replaces proxies, proxy-groups, and proxy-providers in the canvas.') }}</p>
+        <div class="file-row"><input ref="fileInput" type="file" accept=".yaml,.yml,text/yaml,text/plain" @change="readFile" /><button class="button button-secondary" @click="fileInput?.click()">{{ tr('选择 YAML 文件','Choose YAML file') }}</button><small>{{ tr('支持 .yaml / .yml','Supports .yaml / .yml') }}</small></div>
+        <textarea v-model="importText" class="large-code-editor" spellcheck="false" placeholder="{{ tr('粘贴配置片段...','Paste a config fragment...') }}" />
+        <div class="modal-foot"><small>{{ tr('只处理三个核心配置片段；其他顶层配置不会导出。','Only the three core sections are handled; other top-level settings are not exported.') }}</small><div><button class="button button-quiet" @click="importOpen=false">{{ tr('取消','Cancel') }}</button><button class="button button-primary" @click="applyImport">{{ tr('解析并导入','Parse and import') }}</button></div></div>
       </section>
     </div>
     <div v-if="sourceOpen" class="modal-backdrop" @click.self="sourceOpen=false">
       <section class="modal source-modal">
-        <div class="modal-head"><div><div class="eyebrow">SOURCE MODE</div><h2>YAML 源码编辑</h2></div><button class="close-button" @click="sourceOpen=false">×</button></div>
-        <p>修改 YAML 后点击应用，编辑器会重新解析并重建拓扑。解析失败时当前画布不会被替换。</p>
+        <div class="modal-head"><div><div class="eyebrow">SOURCE MODE</div><h2>{{ tr('YAML 源码编辑','Edit YAML source') }}</h2></div><button class="close-button" @click="sourceOpen=false">×</button></div>
+        <p>{{ tr('修改 YAML 后点击应用，编辑器会重新解析并重建拓扑。解析失败时当前画布不会被替换。','Edit YAML and apply it to rebuild the topology. If parsing fails, the current canvas remains unchanged.') }}</p>
         <textarea v-model="sourceText" class="large-code-editor source-editor" spellcheck="false"></textarea>
-        <div class="modal-foot"><small>未知字段会保留；注释与原始排版不保证逐字节保留。</small><div><button class="button button-quiet" @click="sourceOpen=false">取消</button><button class="button button-primary" @click="applySource">应用到拓扑</button></div></div>
+        <div class="modal-foot"><small>{{ tr('未知字段会保留；注释与原始排版不保证逐字节保留。','Unknown fields are preserved; comments and original formatting are not preserved byte-for-byte.') }}</small><div><button class="button button-quiet" @click="sourceOpen=false">{{ tr('取消','Cancel') }}</button><button class="button button-primary" @click="applySource">{{ tr('应用到拓扑','Apply to topology') }}</button></div></div>
       </section>
     </div>
   </main>
