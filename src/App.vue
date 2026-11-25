@@ -210,9 +210,16 @@ function edgeMeta(relation: ConfigRelation) {
 }
 function drawGraph(fitToView = false) {
   if (!graph) return
-  graph.clearCells()
-  graph.addNodes(model.value.entities.map(nodeMeta))
-  graph.addEdges(model.value.relations.map(edgeMeta))
+
+  // Replace the complete cell collection in one model operation. A sequence
+  // of clearCells/addNodes/addEdges can leave stale rendered views during
+  // batched X6 updates; resetCells makes the graph model authoritative and
+  // prevents old nodes from surviving alongside the newly laid-out nodes.
+  const cells = [
+    ...model.value.entities.map(nodeMeta),
+    ...model.value.relations.map(edgeMeta),
+  ]
+  graph.resetCells(cells)
 
   // Fit only when loading/replacing the document or applying auto layout.
   // Ordinary graph refreshes must keep the user's current pan/zoom untouched.
