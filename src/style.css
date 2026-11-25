@@ -270,3 +270,57 @@
 .theme-light .close-button:hover { background: #e7eef7; }
 .theme-light .theme-toggle { color: #315f9c; }
 .theme-light .theme-toggle:hover { color: #214b83; }
+
+
+/* Bilingual controls and Mihomo documentation fields */
+.language-toggle { min-width: 58px; }
+.mihomo-fields-section { background: rgba(17, 27, 41, .18); }
+.documented-field {
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.documented-field-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 22px;
+}
+.documented-field-head code {
+  color: var(--text);
+  font: 600 14px 'DM Mono', monospace;
+}
+.field-doc-link {
+  color: var(--blue);
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.field-doc-link:hover { text-decoration: underline; }
+.section-doc-link { margin-left: auto; }
+.field-doc-description {
+  margin: 5px 0 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.deprecated-chip {
+  color: #9c681f;
+  background: #f7e8ca;
+  border: 1px solid #e7cc9a;
+  border-radius: 10px;
+  padding: 2px 7px;
+  font-size: 14px;
+}
+.documented-switch { margin-top: 5px; }
+.documented-json { min-height: 64px; height: auto; padding: 8px 10px; font: 14px/1.5 'DM Mono', monospace; }
+.theme-light .mihomo-fields-section { background: #f8fafc; }
+.theme-light .documented-field { border-top-color: #e0e7f0; }
+.theme-light .documented-field-head code { color: #24364c; }
+.theme-light .field-doc-link { color: #326bc2; }
+.theme-light .field-doc-description { color: #64768c; }
+.theme-light .deprecated-chip {
+  color: #875414;
+  background: #fff3dc;
+  border-color: #ead2a6;
+}
