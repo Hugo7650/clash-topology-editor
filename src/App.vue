@@ -427,6 +427,10 @@ function syncSelectionHighlight() {
   const selectedEntityId = selectedId.value
   const selectedRelationIdValue = selectedRelationId.value
   const hasSelection = Boolean(selectedEntityId || selectedRelationIdValue)
+  // Violet is reserved for selection/highlight so it stays distinct from the
+  // warm amber used to identify Provider nodes and provider relationships.
+  const selectionStroke = '#a78bfa'
+  const selectionFill = theme.value === 'light' ? '#f3edff' : '#302448'
 
   // Restore each node's own kind color, except the selected node which gets
   // a clear accent outline and fill.
@@ -435,10 +439,10 @@ function syncSelectionHighlight() {
     if (!node?.isNode()) return
     const base = colorFor(entity.kind)
     const isSelected = entity.id === selectedEntityId
-    node.attr('body/stroke', isSelected ? '#f2bd4f' : base.stroke)
+    node.attr('body/stroke', isSelected ? selectionStroke : base.stroke)
     node.attr('body/strokeWidth', isSelected ? 3.4 : 1.6)
     node.attr('body/fill', isSelected
-      ? (theme.value === 'light' ? '#fff6dc' : '#3a321f')
+      ? selectionFill
       : base.fill)
   })
 
@@ -457,7 +461,7 @@ function syncSelectionHighlight() {
       ? '#d99d53'
       : relation.kind === 'dialer' ? '#66b7a3' : '#849ab8'
 
-    edge.attr('line/stroke', isHighlighted ? '#f2bd4f' : baseStroke)
+    edge.attr('line/stroke', isHighlighted ? selectionStroke : baseStroke)
     edge.attr('line/strokeWidth', isHighlighted ? 3.2 : 1.8)
     edge.attr('line/opacity', hasSelection && !isHighlighted ? 0.2 : 1)
   })
